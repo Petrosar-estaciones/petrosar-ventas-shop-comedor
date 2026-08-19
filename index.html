@@ -203,6 +203,35 @@
   td.shop-col{color:#9C6A1B;}
   td.comedor-col{color:#1E4C3F;}
 
+  /* ── ANÁLISIS FINANCIERO ─────────────────────────────── */
+  .analisis-texto{
+    margin:0;
+    font-size:14.5px;
+    line-height:1.75;
+    color:var(--ink);
+  }
+  .analisis-texto strong{color:var(--navy);}
+  .analisis-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+  }
+  .analisis-card{padding:20px;}
+  .analisis-valor{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:22px;
+    margin:8px 0 4px;
+  }
+  .analisis-valor.shop{color:#9C6A1B;}
+  .analisis-valor.comedor{color:#1E4C3F;}
+  .analisis-valor.neutral{color:var(--ink);}
+  .analisis-nota{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.4;
+  }
+
   footer{
     margin-top:60px;
     padding:22px 0;
@@ -216,6 +245,7 @@
   @media (max-width:720px){
     .kpis{grid-template-columns:repeat(2,1fr);}
     .grid-2{grid-template-columns:1fr;}
+    .analisis-grid{grid-template-columns:repeat(2,1fr);}
   }
 </style>
 </head>
@@ -226,12 +256,6 @@
     <div class="eyebrow">PETROSAR · EESS CD Tienda</div>
     <h1>Evolución de ventas por rubro:<br>Shop y Comedor — 2026</h1>
     <p class="sub">Comparativo mensual de facturación entre el rubro Shop y el rubro Comedor, con IVA incluído.</p>
-
-    <div class="kpis" id="kpis">
-      <div class="kpi" style="grid-column:1/-1;text-align:center;padding:30px;">
-        <div class="kpi-label" style="margin:0;">Cargando datos del sheet…</div>
-      </div>
-    </div>
   </div>
 </header>
 
@@ -239,9 +263,11 @@
 
   <div id="errorBox" style="display:none;background:#fff3f0;border:1px solid #e3b8ad;color:#8a3a2a;border-radius:10px;padding:18px 22px;margin-top:30px;font-size:13.5px;line-height:1.6;"></div>
 
+  <div id="cargando" style="text-align:center;padding:60px 0;font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);font-size:13px;">Cargando datos del sheet…</div>
+
   <div id="contenido" style="display:none;">
 
-  <section>
+  <section style="padding-top:36px;">
     <div class="section-head">
       <h2>Evolución mensual</h2>
       <div class="legend">
@@ -252,6 +278,11 @@
     <div class="card">
       <div class="chart-box"><canvas id="chartEvolucion"></canvas></div>
     </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Resumen</h2></div>
+    <div class="kpis" id="kpis"></div>
   </section>
 
   <section>
@@ -283,6 +314,47 @@
         </thead>
         <tbody id="tablaBody"></tbody>
       </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Análisis financiero</h2>
+      <div class="legend"><span style="color:var(--ink-soft);">Calculado sobre los meses cargados</span></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <p id="lecturaPeriodo" class="analisis-texto"></p>
+    </div>
+
+    <div class="analisis-grid">
+      <div class="card analisis-card">
+        <div class="kpi-label" style="color:var(--ink-soft);">Volatilidad Shop</div>
+        <div class="analisis-valor shop" id="volShop">—</div>
+        <div class="analisis-nota">desvío mensual respecto al promedio</div>
+      </div>
+      <div class="card analisis-card">
+        <div class="kpi-label" style="color:var(--ink-soft);">Volatilidad Comedor</div>
+        <div class="analisis-valor comedor" id="volComedor">—</div>
+        <div class="analisis-nota">desvío mensual respecto al promedio</div>
+      </div>
+      <div class="card analisis-card">
+        <div class="kpi-label" style="color:var(--ink-soft);">Correlación Shop / Comedor</div>
+        <div class="analisis-valor neutral" id="correlacion">—</div>
+        <div class="analisis-nota" id="correlacionNota">—</div>
+      </div>
+      <div class="card analisis-card">
+        <div class="kpi-label" style="color:var(--ink-soft);">Proyección próximo mes</div>
+        <div class="analisis-valor neutral" id="proyeccion">—</div>
+        <div class="analisis-nota">total combinado, tendencia lineal</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-head" style="margin-bottom:14px;">
+        <h2 style="font-size:16px;">Variación mes a mes</h2>
+      </div>
+      <div class="chart-box small"><canvas id="chartVariacion"></canvas></div>
     </div>
   </section>
 
@@ -345,17 +417,18 @@ async function cargarDatos(){
     if (!DATA.length) throw new Error('El sheet no tiene filas de datos reconocibles.');
 
     renderDashboard(DATA);
+    document.getElementById('cargando').style.display = 'none';
     document.getElementById('contenido').style.display = 'block';
     document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleString('es-AR');
 
   } catch(e){
+    document.getElementById('cargando').style.display = 'none';
     const box = document.getElementById('errorBox');
     box.style.display = 'block';
     box.innerHTML = `<strong>No se pudo cargar el sheet en vivo.</strong><br>${e.message}<br><br>
       Para que esto funcione, el Google Sheet tiene que estar compartido como
       <strong>"Cualquiera con el enlace — Lector"</strong> (Compartir → Acceso general).
       Si ya está así y sigue sin andar, puede ser un bloqueo temporal de Google — probá recargar en unos minutos.`;
-    document.getElementById('kpis').innerHTML = '';
   }
 }
 
@@ -385,15 +458,15 @@ function renderDashboard(DATA){
     </div>
   `).join('');
 
-  // ── Chart evolución ──
+  // ── Chart evolución (un solo eje: Comedor siempre se ve por encima de Shop) ──
   if (window._chartEvo) window._chartEvo.destroy();
   window._chartEvo = new Chart(document.getElementById('chartEvolucion'), {
     type: 'line',
     data: {
       labels: DATA.map(d=>d.mes),
       datasets: [
-        { label:'Shop', data: DATA.map(d=>d.totalShop), borderColor:'#E8A13D', backgroundColor:'rgba(232,161,61,0.12)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#E8A13D', tension:0.35, fill:true, yAxisID:'yShop' },
-        { label:'Comedor', data: DATA.map(d=>d.totalComedor), borderColor:'#2F6F5E', backgroundColor:'rgba(47,111,94,0.10)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#2F6F5E', tension:0.35, fill:true, yAxisID:'yComedor' }
+        { label:'Shop', data: DATA.map(d=>d.totalShop), borderColor:'#E8A13D', backgroundColor:'rgba(232,161,61,0.12)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#E8A13D', tension:0.35, fill:true },
+        { label:'Comedor', data: DATA.map(d=>d.totalComedor), borderColor:'#2F6F5E', backgroundColor:'rgba(47,111,94,0.10)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#2F6F5E', tension:0.35, fill:true }
       ]
     },
     options: {
@@ -405,8 +478,11 @@ function renderDashboard(DATA){
       },
       scales:{
         x:{ grid:{display:false}, ticks:{font:{family:'IBM Plex Mono', size:11}, color:'#5B6B76'} },
-        yShop:{ position:'left', ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#9C6A1B' }, grid:{ color:'#EFEAD9' } },
-        yComedor:{ position:'right', ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#1E4C3F' }, grid:{ display:false } }
+        y:{
+          beginAtZero:true,
+          ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#5B6B76' },
+          grid:{ color:'#EFEAD9' }
+        }
       }
     }
   });
@@ -458,6 +534,125 @@ function renderDashboard(DATA){
       <td>${fmt(totalCombinado)}</td>
     </tr>
   `;
+
+  analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partComedor);
+}
+
+// ─── ANÁLISIS FINANCIERO ─────────────────────────────────────────────────
+function media(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function desvioEstandar(arr){
+  const m = media(arr);
+  const varianza = arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/arr.length;
+  return Math.sqrt(varianza);
+}
+function variacionesPct(serie){
+  const out = [];
+  for (let i=1;i<serie.length;i++){
+    out.push( (serie[i]-serie[i-1])/serie[i-1]*100 );
+  }
+  return out;
+}
+function correlacionPearson(x,y){
+  const mx = media(x), my = media(y);
+  let num=0, dx=0, dy=0;
+  for (let i=0;i<x.length;i++){
+    num += (x[i]-mx)*(y[i]-my);
+    dx  += Math.pow(x[i]-mx,2);
+    dy  += Math.pow(y[i]-my,2);
+  }
+  const den = Math.sqrt(dx*dy);
+  return den === 0 ? 0 : num/den;
+}
+// Regresión lineal simple y = a + b*x, devuelve el valor proyectado para el próximo punto
+function proyeccionLineal(serie){
+  const n = serie.length;
+  const xs = serie.map((_,i)=>i);
+  const mx = media(xs), my = media(serie);
+  let num=0, den=0;
+  for (let i=0;i<n;i++){ num += (xs[i]-mx)*(serie[i]-my); den += Math.pow(xs[i]-mx,2); }
+  const b = den===0 ? 0 : num/den;
+  const a = my - b*mx;
+  return a + b*n; // siguiente x = n
+}
+
+function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partComedor){
+  const seriesShop = DATA.map(d=>d.totalShop);
+  const seriesComedor = DATA.map(d=>d.totalComedor);
+  const seriesCombinado = DATA.map(d=>d.totalShop + d.totalComedor);
+
+  const volShopPct = (desvioEstandar(seriesShop)/media(seriesShop))*100;
+  const volComedorPct = (desvioEstandar(seriesComedor)/media(seriesComedor))*100;
+
+  const varShop = variacionesPct(seriesShop);
+  const varComedor = variacionesPct(seriesComedor);
+
+  const corr = correlacionPearson(seriesShop, seriesComedor);
+
+  const proyCombinado = proyeccionLineal(seriesCombinado);
+  const proyVsUltimo = ((proyCombinado - seriesCombinado[seriesCombinado.length-1]) / seriesCombinado[seriesCombinado.length-1]) * 100;
+
+  // Mes de mayor y menor venta combinada
+  let idxMax=0, idxMin=0;
+  seriesCombinado.forEach((v,i)=>{ if (v>seriesCombinado[idxMax]) idxMax=i; if (v<seriesCombinado[idxMin]) idxMin=i; });
+  const mesMax = DATA[idxMax].mes, mesMin = DATA[idxMin].mes;
+
+  // Tendencia general: comparar primera mitad vs segunda mitad del período
+  const mitad = Math.floor(DATA.length/2);
+  const promPrimeraMitad = media(seriesCombinado.slice(0, mitad || 1));
+  const promSegundaMitad = media(seriesCombinado.slice(mitad));
+  const tendenciaPct = ((promSegundaMitad - promPrimeraMitad)/promPrimeraMitad)*100;
+
+  // Interpretación de correlación
+  let corrTexto;
+  if (Math.abs(corr) < 0.3) corrTexto = 'los rubros se mueven de forma prácticamente independiente';
+  else if (corr >= 0.3) corrTexto = 'ambos rubros tienden a subir y bajar juntos';
+  else corrTexto = 'cuando uno sube el otro tiende a bajar';
+
+  // Volatilidad relativa: cuál es más estable
+  const masVolatil = volShopPct > volComedorPct ? 'Shop' : 'Comedor';
+  const masEstable = masVolatil === 'Shop' ? 'Comedor' : 'Shop';
+
+  document.getElementById('lecturaPeriodo').innerHTML = `
+    En los <strong>${DATA.length} meses</strong> analizados, la facturación combinada promedió
+    <strong>${fmtM(media(seriesCombinado))}</strong> mensuales, con <strong>${mesMax}</strong> como el mes de mayor
+    venta y <strong>${mesMin}</strong> como el más bajo. Comparando la primera mitad del período contra la segunda,
+    la facturación combinada muestra una <strong>${tendenciaPct>=0?'suba':'baja'} del ${Math.abs(tendenciaPct).toFixed(1)}%</strong>.
+    Rubro Comedor representa en promedio el <strong>${partComedor.toFixed(1)}%</strong> del total facturado.
+    En términos de estabilidad mes a mes, <strong>${masVolatil}</strong> es el rubro más volátil
+    (variación de ${masVolatil==='Shop'?volShopPct.toFixed(1):volComedorPct.toFixed(1)}% respecto a su promedio),
+    mientras que <strong>${masEstable}</strong> se mantiene más estable. El coeficiente de correlación entre ambos
+    rubros es de <strong>${corr.toFixed(2)}</strong>, lo que indica que ${corrTexto}.
+  `;
+
+  document.getElementById('volShop').textContent = volShopPct.toFixed(1) + '%';
+  document.getElementById('volComedor').textContent = volComedorPct.toFixed(1) + '%';
+  document.getElementById('correlacion').textContent = corr.toFixed(2);
+  document.getElementById('correlacionNota').textContent = corrTexto;
+  document.getElementById('proyeccion').textContent = fmtM(proyCombinado);
+
+  // ── Chart de variación % mes a mes ──
+  if (window._chartVar) window._chartVar.destroy();
+  window._chartVar = new Chart(document.getElementById('chartVariacion'), {
+    type: 'bar',
+    data: {
+      labels: DATA.slice(1).map(d=>d.mes),
+      datasets: [
+        { label:'Shop', data: varShop, backgroundColor:'#E8A13D', borderRadius:3, maxBarThickness:28 },
+        { label:'Comedor', data: varComedor, backgroundColor:'#2F6F5E', borderRadius:3, maxBarThickness:28 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'bottom', labels:{ font:{family:'IBM Plex Mono', size:11}, color:'#1C2B36', usePointStyle:true, pointStyle:'rect' } },
+        tooltip:{ backgroundColor:'#0F2A43', padding:12, titleFont:{family:'IBM Plex Mono'}, bodyFont:{family:'IBM Plex Mono'}, callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${ctx.parsed.y>=0?'+':''}${ctx.parsed.y.toFixed(1)}%` } }
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{family:'IBM Plex Mono', size:11}, color:'#5B6B76'} },
+        y:{ ticks:{ callback:(v)=>v+'%', font:{family:'IBM Plex Mono', size:10}, color:'#5B6B76' }, grid:{ color:'#EFEAD9' } }
+      }
+    }
+  });
 }
 
 cargarDatos();
