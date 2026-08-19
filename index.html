@@ -71,7 +71,6 @@
     display:grid;
     grid-template-columns:repeat(4,1fr);
     gap:14px;
-    margin-top:36px;
   }
   .kpi{
     background:var(--panel-dark);
@@ -149,6 +148,7 @@
   }
   .chart-box{height:340px;position:relative;}
   .chart-box.small{height:270px;}
+  .chart-box.medium{height:320px;}
 
   .grid-2{
     display:grid;
@@ -203,6 +203,56 @@
   td.shop-col{color:#9C6A1B;}
   td.comedor-col{color:#1E4C3F;}
 
+  /* ── DESGLOSE POR RUBRO ──────────────────────────────── */
+  .tabs{
+    display:inline-flex;
+    background:#EFEAD9;
+    border-radius:8px;
+    padding:4px;
+    gap:4px;
+  }
+  .tab-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    padding:9px 20px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab-btn.active{background:var(--navy);color:#fff;}
+  .tab-btn:not(.active):hover{background:rgba(15,42,67,.08);}
+
+  .subrubro-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .subrubro-row:last-child{border-bottom:none;}
+  .subrubro-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+  .subrubro-nombre{flex:1;font-weight:500;}
+  .subrubro-total{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .subrubro-pct{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    width:44px;
+    text-align:right;
+  }
+
   /* ── ANÁLISIS FINANCIERO ─────────────────────────────── */
   .analisis-texto{
     margin:0;
@@ -254,8 +304,8 @@
 <header>
   <div class="wrap">
     <div class="eyebrow">PETROSAR · EESS CD Tienda</div>
-    <h1>Evolución de ventas por rubro:<br>Shop y Comedor — 2026</h1>
-    <p class="sub">Comparativo mensual de facturación entre el rubro Shop y el rubro Comedor, con IVA incluído.</p>
+    <h1>Evolución de ventas por rubro:<br>Shop y Comedor</h1>
+    <p class="sub">Comparativo mensual de facturación entre el rubro Shop y el rubro Comedor, sin IVA.</p>
   </div>
 </header>
 
@@ -283,6 +333,19 @@
   <section>
     <div class="section-head"><h2>Resumen</h2></div>
     <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Desglose por rubro menor</h2>
+      <div class="tabs" id="tabsRubro"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="chart-box medium"><canvas id="chartDesglose"></canvas></div>
+      </div>
+      <div class="card" id="listaSubrubros"></div>
+    </div>
   </section>
 
   <section>
@@ -375,6 +438,15 @@ const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?forma
 const fmt = (n) => '$ ' + Math.round(n).toLocaleString('es-AR');
 const fmtM = (n) => '$ ' + (n/1000000).toLocaleString('es-AR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'M';
 
+const NOMBRES_MES = { ene:'Enero', feb:'Febrero', mar:'Marzo', abr:'Abril', may:'Mayo', jun:'Junio', jul:'Julio', ago:'Agosto', sep:'Septiembre', sept:'Septiembre', oct:'Octubre', nov:'Noviembre', dic:'Diciembre' };
+function nombreMes(abbr){
+  const k = (abbr||'').toLowerCase().replace(/\./g,'').trim();
+  return NOMBRES_MES[k] || abbr;
+}
+
+const PALETA_COMEDOR = ['#2F6F5E','#3F8E77','#59A78F','#7FC1AC','#A8D8C8','#1E4C3F','#0F3229','#4E7A6D'];
+const PALETA_SHOP     = ['#E8A13D','#D98527','#C46A1D','#F0B75E','#F6D9A6','#9C6A1B','#7A4E12','#B98A3F'];
+
 function parseCSV(text){
   const lines = text.split(/\r?\n/).filter(l => l.length);
   return lines.map(line => {
@@ -391,9 +463,14 @@ function parseCSV(text){
 }
 
 function numAR(s){
-  if (!s) return NaN;
-  return parseFloat(s.replace(/\./g,'').replace(',','.').trim());
+  if (!s) return 0;
+  const v = parseFloat(String(s).replace(/\./g,'').replace(',','.').trim());
+  return isNaN(v) ? 0 : v;
 }
+
+let RUBROS = [];        // detalle por rubro menor: {rubroMayor, rubro, valores:{mesLabel:num}}
+let MESES_COLS = [];    // [{label, nombre}] meses con datos reales
+let RUBRO_ACTIVO = 'COMEDOR';
 
 async function cargarDatos(){
   try {
@@ -401,22 +478,54 @@ async function cargarDatos(){
     if (!res.ok) throw new Error('No se pudo leer el sheet (status ' + res.status + ')');
     const text = await res.text();
     const rows = parseCSV(text);
+    if (rows.length < 2) throw new Error('El sheet no tiene filas de datos.');
 
-    // Filas de datos: desde la 2 (índice 1), hasta que MES quede vacío
-    const DATA = [];
+    const header = rows[0];
+
+    // Columnas de mes: desde la 3 (índice 2) en adelante, hasta que el header quede vacío
+    const monthColsRaw = [];
+    for (let c=2; c<header.length; c++){
+      const label = (header[c]||'').trim();
+      if (!label) break;
+      monthColsRaw.push({ index:c, label });
+    }
+    if (!monthColsRaw.length) throw new Error('No se encontraron columnas de mes en el sheet.');
+
+    // Filas de rubro menor
+    const rubros = [];
+    let lastRubroMayor = '';
     for (let i=1; i<rows.length; i++){
       const r = rows[i];
-      const mes = (r[0]||'').trim();
-      if (!mes) break; // corta antes de la fila de totales / vacías
-      const shop = numAR(r[1]), ivaShop = numAR(r[2]), totalShop = numAR(r[3]);
-      const comedor = numAR(r[4]), ivaComedor = numAR(r[5]), totalComedor = numAR(r[6]);
-      if ([shop,totalShop,comedor,totalComedor].some(isNaN)) continue;
-      DATA.push({ mes, shop, ivaShop, totalShop, comedor, ivaComedor, totalComedor });
+      let rubroMayor = (r[0]||'').trim().toUpperCase();
+      const rubro = (r[1]||'').trim();
+      if (!rubroMayor && !rubro) continue;
+      if (rubroMayor) lastRubroMayor = rubroMayor; else rubroMayor = lastRubroMayor;
+      if (!rubro) continue;
+      const valores = {};
+      monthColsRaw.forEach(mc => { valores[mc.label] = numAR(r[mc.index]); });
+      rubros.push({ rubroMayor, rubro, valores });
     }
 
-    if (!DATA.length) throw new Error('El sheet no tiene filas de datos reconocibles.');
+    if (!rubros.length) throw new Error('El sheet no tiene filas de rubros reconocibles.');
+
+    // Solo meses con al menos un valor cargado (> 0) en algún rubro
+    const mesesConDatos = monthColsRaw.filter(mc => rubros.some(r => r.valores[mc.label] > 0));
+    if (!mesesConDatos.length) throw new Error('Ningún mes tiene datos cargados todavía.');
+
+    RUBROS = rubros;
+    MESES_COLS = mesesConDatos.map(mc => ({ label: mc.label, nombre: nombreMes(mc.label) }));
+
+    // Totales por mes y por rubro mayor (Shop / Comedor)
+    const DATA = MESES_COLS.map(mc => {
+      const totalShop = rubros.filter(r=>r.rubroMayor==='SHOP').reduce((a,r)=>a+(r.valores[mc.label]||0),0);
+      const totalComedor = rubros.filter(r=>r.rubroMayor==='COMEDOR').reduce((a,r)=>a+(r.valores[mc.label]||0),0);
+      return { mes: mc.nombre, mesLabel: mc.label, totalShop, totalComedor };
+    });
 
     renderDashboard(DATA);
+    renderTabsRubro();
+    renderDesglose(RUBRO_ACTIVO);
+
     document.getElementById('cargando').style.display = 'none';
     document.getElementById('contenido').style.display = 'block';
     document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleString('es-AR');
@@ -432,6 +541,69 @@ async function cargarDatos(){
   }
 }
 
+// ─── TABS + DESGLOSE POR RUBRO MENOR ────────────────────────────────────────
+function renderTabsRubro(){
+  const mayores = [...new Set(RUBROS.map(r=>r.rubroMayor))];
+  document.getElementById('tabsRubro').innerHTML = mayores.map(rm => `
+    <button class="tab-btn ${rm===RUBRO_ACTIVO?'active':''}" data-rubro="${rm}">${rm}</button>
+  `).join('');
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      RUBRO_ACTIVO = btn.dataset.rubro;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+      renderDesglose(RUBRO_ACTIVO);
+    });
+  });
+}
+
+function renderDesglose(rubroMayor){
+  const subrubros = RUBROS.filter(r=>r.rubroMayor===rubroMayor);
+  const paleta = rubroMayor === 'COMEDOR' ? PALETA_COMEDOR : PALETA_SHOP;
+
+  // Chart stacked por mes
+  if (window._chartDesglose) window._chartDesglose.destroy();
+  window._chartDesglose = new Chart(document.getElementById('chartDesglose'), {
+    type: 'bar',
+    data: {
+      labels: MESES_COLS.map(m=>m.nombre),
+      datasets: subrubros.map((sr,i) => ({
+        label: sr.rubro,
+        data: MESES_COLS.map(m => sr.valores[m.label] || 0),
+        backgroundColor: paleta[i % paleta.length],
+        borderRadius: 2,
+      }))
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ backgroundColor:'#0F2A43', padding:12, titleFont:{family:'IBM Plex Mono'}, bodyFont:{family:'IBM Plex Mono', size:11}, callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+      },
+      scales:{
+        x:{ stacked:true, grid:{display:false}, ticks:{font:{family:'IBM Plex Mono', size:11}, color:'#5B6B76'} },
+        y:{ stacked:true, ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#5B6B76' }, grid:{ color:'#EFEAD9' } }
+      }
+    }
+  });
+
+  // Lista de sub-rubros con total y participación
+  const totalesSub = subrubros.map((sr,i) => {
+    const total = MESES_COLS.reduce((a,m)=>a+(sr.valores[m.label]||0),0);
+    return { rubro: sr.rubro, total, color: paleta[i % paleta.length] };
+  }).sort((a,b)=>b.total-a.total);
+
+  const totalRubroMayor = totalesSub.reduce((a,s)=>a+s.total,0);
+
+  document.getElementById('listaSubrubros').innerHTML = totalesSub.map(s => `
+    <div class="subrubro-row">
+      <span class="subrubro-dot" style="background:${s.color}"></span>
+      <span class="subrubro-nombre">${s.rubro}</span>
+      <span class="subrubro-total">${fmt(s.total)}</span>
+      <span class="subrubro-pct">${(s.total/totalRubroMayor*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+}
+
 function renderDashboard(DATA){
   const totalShop = DATA.reduce((a,d)=>a+d.totalShop,0);
   const totalComedor = DATA.reduce((a,d)=>a+d.totalComedor,0);
@@ -439,9 +611,9 @@ function renderDashboard(DATA){
   const partComedor = (totalComedor/totalCombinado*100);
 
   const primerShop = DATA[0].totalShop, ultimoShop = DATA[DATA.length-1].totalShop;
-  const deltaShop = ((ultimoShop-primerShop)/primerShop*100);
+  const deltaShop = primerShop === 0 ? 0 : ((ultimoShop-primerShop)/primerShop*100);
   const primerCom = DATA[0].totalComedor, ultimoCom = DATA[DATA.length-1].totalComedor;
-  const deltaCom = ((ultimoCom-primerCom)/primerCom*100);
+  const deltaCom = primerCom === 0 ? 0 : ((ultimoCom-primerCom)/primerCom*100);
 
   // ── KPIs ──
   const kpis = [
@@ -504,7 +676,7 @@ function renderDashboard(DATA){
   // ── Participación por mes ──
   document.getElementById('participacion').innerHTML = DATA.map(d=>{
     const tot = d.totalShop + d.totalComedor;
-    const pShop = d.totalShop/tot*100;
+    const pShop = tot===0 ? 0 : d.totalShop/tot*100;
     const pCom = 100-pShop;
     return `
       <div class="part-row">
@@ -518,7 +690,7 @@ function renderDashboard(DATA){
     `;
   }).join('');
 
-  // ── Tabla (solo totales, sin neto ni IVA) ──
+  // ── Tabla (solo totales) ──
   document.getElementById('tablaBody').innerHTML = DATA.map(d=>`
     <tr>
       <td>${d.mes}</td>
@@ -548,7 +720,7 @@ function desvioEstandar(arr){
 function variacionesPct(serie){
   const out = [];
   for (let i=1;i<serie.length;i++){
-    out.push( (serie[i]-serie[i-1])/serie[i-1]*100 );
+    out.push( serie[i-1]===0 ? 0 : (serie[i]-serie[i-1])/serie[i-1]*100 );
   }
   return out;
 }
@@ -563,7 +735,6 @@ function correlacionPearson(x,y){
   const den = Math.sqrt(dx*dy);
   return den === 0 ? 0 : num/den;
 }
-// Regresión lineal simple y = a + b*x, devuelve el valor proyectado para el próximo punto
 function proyeccionLineal(serie){
   const n = serie.length;
   const xs = serie.map((_,i)=>i);
@@ -572,7 +743,7 @@ function proyeccionLineal(serie){
   for (let i=0;i<n;i++){ num += (xs[i]-mx)*(serie[i]-my); den += Math.pow(xs[i]-mx,2); }
   const b = den===0 ? 0 : num/den;
   const a = my - b*mx;
-  return a + b*n; // siguiente x = n
+  return a + b*n;
 }
 
 function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partComedor){
@@ -580,8 +751,8 @@ function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partCom
   const seriesComedor = DATA.map(d=>d.totalComedor);
   const seriesCombinado = DATA.map(d=>d.totalShop + d.totalComedor);
 
-  const volShopPct = (desvioEstandar(seriesShop)/media(seriesShop))*100;
-  const volComedorPct = (desvioEstandar(seriesComedor)/media(seriesComedor))*100;
+  const volShopPct = media(seriesShop)===0 ? 0 : (desvioEstandar(seriesShop)/media(seriesShop))*100;
+  const volComedorPct = media(seriesComedor)===0 ? 0 : (desvioEstandar(seriesComedor)/media(seriesComedor))*100;
 
   const varShop = variacionesPct(seriesShop);
   const varComedor = variacionesPct(seriesComedor);
@@ -589,26 +760,21 @@ function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partCom
   const corr = correlacionPearson(seriesShop, seriesComedor);
 
   const proyCombinado = proyeccionLineal(seriesCombinado);
-  const proyVsUltimo = ((proyCombinado - seriesCombinado[seriesCombinado.length-1]) / seriesCombinado[seriesCombinado.length-1]) * 100;
 
-  // Mes de mayor y menor venta combinada
   let idxMax=0, idxMin=0;
   seriesCombinado.forEach((v,i)=>{ if (v>seriesCombinado[idxMax]) idxMax=i; if (v<seriesCombinado[idxMin]) idxMin=i; });
   const mesMax = DATA[idxMax].mes, mesMin = DATA[idxMin].mes;
 
-  // Tendencia general: comparar primera mitad vs segunda mitad del período
   const mitad = Math.floor(DATA.length/2);
   const promPrimeraMitad = media(seriesCombinado.slice(0, mitad || 1));
   const promSegundaMitad = media(seriesCombinado.slice(mitad));
-  const tendenciaPct = ((promSegundaMitad - promPrimeraMitad)/promPrimeraMitad)*100;
+  const tendenciaPct = promPrimeraMitad===0 ? 0 : ((promSegundaMitad - promPrimeraMitad)/promPrimeraMitad)*100;
 
-  // Interpretación de correlación
   let corrTexto;
   if (Math.abs(corr) < 0.3) corrTexto = 'los rubros se mueven de forma prácticamente independiente';
   else if (corr >= 0.3) corrTexto = 'ambos rubros tienden a subir y bajar juntos';
   else corrTexto = 'cuando uno sube el otro tiende a bajar';
 
-  // Volatilidad relativa: cuál es más estable
   const masVolatil = volShopPct > volComedorPct ? 'Shop' : 'Comedor';
   const masEstable = masVolatil === 'Shop' ? 'Comedor' : 'Shop';
 
@@ -630,7 +796,6 @@ function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partCom
   document.getElementById('correlacionNota').textContent = corrTexto;
   document.getElementById('proyeccion').textContent = fmtM(proyCombinado);
 
-  // ── Chart de variación % mes a mes ──
   if (window._chartVar) window._chartVar.destroy();
   window._chartVar = new Chart(document.getElementById('chartVariacion'), {
     type: 'bar',
