@@ -276,12 +276,9 @@
         <thead>
           <tr>
             <th>Mes</th>
-            <th>Shop</th>
-            <th>IVA 21% Shop</th>
             <th>Total Shop</th>
-            <th>Comedor</th>
-            <th>IVA 21% Comedor</th>
             <th>Total Comedor</th>
+            <th>Total General</th>
           </tr>
         </thead>
         <tbody id="tablaBody"></tbody>
@@ -445,26 +442,20 @@ function renderDashboard(DATA){
     `;
   }).join('');
 
-  // ── Tabla ──
+  // ── Tabla (solo totales, sin neto ni IVA) ──
   document.getElementById('tablaBody').innerHTML = DATA.map(d=>`
     <tr>
       <td>${d.mes}</td>
-      <td class="shop-col">${fmt(d.shop)}</td>
-      <td class="shop-col">${fmt(d.ivaShop)}</td>
       <td class="shop-col">${fmt(d.totalShop)}</td>
-      <td class="comedor-col">${fmt(d.comedor)}</td>
-      <td class="comedor-col">${fmt(d.ivaComedor)}</td>
       <td class="comedor-col">${fmt(d.totalComedor)}</td>
+      <td>${fmt(d.totalShop + d.totalComedor)}</td>
     </tr>
   `).join('') + `
     <tr class="total">
       <td>Total</td>
-      <td class="shop-col">${fmt(DATA.reduce((a,d)=>a+d.shop,0))}</td>
-      <td class="shop-col">${fmt(DATA.reduce((a,d)=>a+d.ivaShop,0))}</td>
       <td class="shop-col">${fmt(totalShop)}</td>
-      <td class="comedor-col">${fmt(DATA.reduce((a,d)=>a+d.comedor,0))}</td>
-      <td class="comedor-col">${fmt(DATA.reduce((a,d)=>a+d.ivaComedor,0))}</td>
       <td class="comedor-col">${fmt(totalComedor)}</td>
+      <td>${fmt(totalCombinado)}</td>
     </tr>
   `;
 }
