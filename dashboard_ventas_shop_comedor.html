@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PETROSAR · Evolución de Ventas SHOP / COMEDOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#0F2A43;
+    --paper:#F6F3EC;
+    --ink:#1C2B36;
+    --ink-soft:#5B6B76;
+    --shop:#E8A13D;
+    --shop-soft:#F6D9A6;
+    --comedor:#2F6F5E;
+    --comedor-soft:#BFDBD1;
+    --line:#DAD5C7;
+    --panel-dark:#0B2032;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1140px;margin:0 auto;padding:0 24px 80px;}
+
+  /* ── HEADER ─────────────────────────────────────────── */
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:44px 24px 56px;
+    position:relative;
+    overflow:hidden;
+  }
+  header .wrap{padding-bottom:0;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:#9FB4C4;
+    margin-bottom:14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--shop);box-shadow:0 0 0 3px rgba(232,161,61,.25);}
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:clamp(28px,4.2vw,44px);
+    line-height:1.08;
+    margin:0 0 12px;
+    max-width:760px;
+  }
+  header p.sub{
+    font-size:15px;
+    color:#C7D3DC;
+    max-width:560px;
+    line-height:1.55;
+    margin:0;
+  }
+
+  /* ── KPI / PUMP DISPLAY ─────────────────────────────── */
+  .kpis{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-top:36px;
+  }
+  .kpi{
+    background:var(--panel-dark);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;
+    padding:18px 18px 16px;
+    position:relative;
+  }
+  .kpi::before{
+    content:attr(data-idx);
+    position:absolute;top:12px;right:14px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:rgba(255,255,255,.25);
+  }
+  .kpi-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.5);
+    margin-bottom:10px;
+  }
+  .kpi-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:26px;
+    letter-spacing:.01em;
+    font-variant-numeric:tabular-nums;
+  }
+  .kpi-value.shop{color:var(--shop);text-shadow:0 0 14px rgba(232,161,61,.35);}
+  .kpi-value.comedor{color:var(--comedor-soft);text-shadow:0 0 14px rgba(191,219,209,.25);}
+  .kpi-value.neutral{color:#fff;}
+  .kpi-delta{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    margin-top:6px;
+    color:rgba(255,255,255,.45);
+  }
+  .kpi-delta.up{color:#8FD4B0;}
+  .kpi-delta.down{color:#E39494;}
+
+  /* ── SECTIONS ────────────────────────────────────────── */
+  section{padding:52px 0 0;}
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:22px;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  h2{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:22px;
+    margin:0;
+  }
+  .legend{
+    display:flex;gap:18px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
+  .dot.shop{background:var(--shop);}
+  .dot.comedor{background:var(--comedor);}
+
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:26px;
+  }
+  .chart-box{height:340px;position:relative;}
+  .chart-box.small{height:270px;}
+
+  .grid-2{
+    display:grid;
+    grid-template-columns:1.4fr 1fr;
+    gap:20px;
+    align-items:stretch;
+  }
+
+  /* ── PARTICIPACIÓN LIST ─────────────────────────────── */
+  .part-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+  }
+  .part-row:last-child{border-bottom:none;}
+  .part-mes{width:78px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .part-bar-wrap{flex:1;display:flex;height:16px;border-radius:3px;overflow:hidden;background:#F0ECE0;}
+  .part-bar.shop{background:var(--shop);}
+  .part-bar.comedor{background:var(--comedor);}
+  .part-pct{width:44px;text-align:right;color:var(--ink-soft);}
+
+  /* ── TABLE ───────────────────────────────────────────── */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:0 8px 12px;
+    border-bottom:2px solid var(--ink);
+  }
+  thead th:first-child{text-align:left;}
+  tbody td{
+    padding:11px 8px;
+    text-align:right;
+    border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums;
+  }
+  tbody td:first-child{text-align:left;font-weight:600;font-family:'Fraunces',serif;}
+  tbody tr.total td{
+    border-top:2px solid var(--ink);
+    border-bottom:none;
+    font-weight:700;
+    padding-top:14px;
+  }
+  td.shop-col{color:#9C6A1B;}
+  td.comedor-col{color:#1E4C3F;}
+
+  footer{
+    margin-top:60px;
+    padding:22px 0;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  }
+
+  @media (max-width:720px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">PETROSAR · EESS CD Tienda</div>
+    <h1>Evolución de ventas por rubro:<br>Shop y Comedor — 2026</h1>
+    <p class="sub">Comparativo mensual de facturación entre el rubro Shop y el rubro Comedor, con IVA discriminado por línea de negocio. Los datos se actualizan solos desde el sheet.</p>
+
+    <div class="kpis" id="kpis">
+      <div class="kpi" style="grid-column:1/-1;text-align:center;padding:30px;">
+        <div class="kpi-label" style="margin:0;">Cargando datos del sheet…</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div id="errorBox" style="display:none;background:#fff3f0;border:1px solid #e3b8ad;color:#8a3a2a;border-radius:10px;padding:18px 22px;margin-top:30px;font-size:13.5px;line-height:1.6;"></div>
+
+  <div id="contenido" style="display:none;">
+
+  <section>
+    <div class="section-head">
+      <h2>Evolución mensual</h2>
+      <div class="legend">
+        <span><span class="dot shop"></span>Shop</span>
+        <span><span class="dot comedor"></span>Comedor</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chart-box"><canvas id="chartEvolucion"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="grid-2">
+      <div>
+        <div class="section-head"><h2>Participación por mes</h2></div>
+        <div class="card" id="participacion"></div>
+      </div>
+      <div>
+        <div class="section-head"><h2>Totales acumulados</h2></div>
+        <div class="card">
+          <div class="chart-box small"><canvas id="chartTotales"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Detalle mensual</h2></div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th>Shop</th>
+            <th>IVA 21% Shop</th>
+            <th>Total Shop</th>
+            <th>Comedor</th>
+            <th>IVA 21% Comedor</th>
+            <th>Total Comedor</th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  </div>
+
+  <footer>
+    <span>Fuente: VENTAS_EESS_CD_TIENDA · Google Sheets (en vivo)</span>
+    <span id="lastUpdate"></span>
+  </footer>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────
+const SHEET_ID = '128OlZoH_MYpCVUsv70INlYz4BfcOr5tKUy41pgKZCQc';
+const GID = '0';
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}`;
+
+const fmt = (n) => '$ ' + Math.round(n).toLocaleString('es-AR');
+const fmtM = (n) => '$ ' + (n/1000000).toLocaleString('es-AR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'M';
+
+function parseCSV(text){
+  const lines = text.split(/\r?\n/).filter(l => l.length);
+  return lines.map(line => {
+    const result = []; let cur = ''; let inQ = false;
+    for (let i=0;i<line.length;i++){
+      const c = line[i];
+      if (c === '"'){ inQ = !inQ; }
+      else if (c === ',' && !inQ){ result.push(cur); cur=''; }
+      else { cur += c; }
+    }
+    result.push(cur);
+    return result;
+  });
+}
+
+function numAR(s){
+  if (!s) return NaN;
+  return parseFloat(s.replace(/\./g,'').replace(',','.').trim());
+}
+
+async function cargarDatos(){
+  try {
+    const res = await fetch(CSV_URL);
+    if (!res.ok) throw new Error('No se pudo leer el sheet (status ' + res.status + ')');
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    // Filas de datos: desde la 2 (índice 1), hasta que MES quede vacío
+    const DATA = [];
+    for (let i=1; i<rows.length; i++){
+      const r = rows[i];
+      const mes = (r[0]||'').trim();
+      if (!mes) break; // corta antes de la fila de totales / vacías
+      const shop = numAR(r[1]), ivaShop = numAR(r[2]), totalShop = numAR(r[3]);
+      const comedor = numAR(r[4]), ivaComedor = numAR(r[5]), totalComedor = numAR(r[6]);
+      if ([shop,totalShop,comedor,totalComedor].some(isNaN)) continue;
+      DATA.push({ mes, shop, ivaShop, totalShop, comedor, ivaComedor, totalComedor });
+    }
+
+    if (!DATA.length) throw new Error('El sheet no tiene filas de datos reconocibles.');
+
+    renderDashboard(DATA);
+    document.getElementById('contenido').style.display = 'block';
+    document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleString('es-AR');
+
+  } catch(e){
+    const box = document.getElementById('errorBox');
+    box.style.display = 'block';
+    box.innerHTML = `<strong>No se pudo cargar el sheet en vivo.</strong><br>${e.message}<br><br>
+      Para que esto funcione, el Google Sheet tiene que estar compartido como
+      <strong>"Cualquiera con el enlace — Lector"</strong> (Compartir → Acceso general).
+      Si ya está así y sigue sin andar, puede ser un bloqueo temporal de Google — probá recargar en unos minutos.`;
+    document.getElementById('kpis').innerHTML = '';
+  }
+}
+
+function renderDashboard(DATA){
+  const totalShop = DATA.reduce((a,d)=>a+d.totalShop,0);
+  const totalComedor = DATA.reduce((a,d)=>a+d.totalComedor,0);
+  const totalCombinado = totalShop + totalComedor;
+  const partComedor = (totalComedor/totalCombinado*100);
+
+  const primerShop = DATA[0].totalShop, ultimoShop = DATA[DATA.length-1].totalShop;
+  const deltaShop = ((ultimoShop-primerShop)/primerShop*100);
+  const primerCom = DATA[0].totalComedor, ultimoCom = DATA[DATA.length-1].totalComedor;
+  const deltaCom = ((ultimoCom-primerCom)/primerCom*100);
+
+  // ── KPIs ──
+  const kpis = [
+    { idx:'01', label:`Total Shop (${DATA.length} meses)`, value: fmtM(totalShop), cls:'shop', delta:`${deltaShop>=0?'▲':'▼'} ${Math.abs(deltaShop).toFixed(1)}% vs. ${DATA[0].mes}`, dcls: deltaShop>=0?'up':'down' },
+    { idx:'02', label:`Total Comedor (${DATA.length} meses)`, value: fmtM(totalComedor), cls:'comedor', delta:`${deltaCom>=0?'▲':'▼'} ${Math.abs(deltaCom).toFixed(1)}% vs. ${DATA[0].mes}`, dcls: deltaCom>=0?'up':'down' },
+    { idx:'03', label:'Total combinado', value: fmtM(totalCombinado), cls:'neutral', delta:`Shop + Comedor, ${DATA.length} meses`, dcls:'' },
+    { idx:'04', label:'Participación Comedor', value: partComedor.toFixed(1)+'%', cls:'neutral', delta:'del total facturado', dcls:'' },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k => `
+    <div class="kpi" data-idx="${k.idx}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}">${k.value}</div>
+      <div class="kpi-delta ${k.dcls}">${k.delta}</div>
+    </div>
+  `).join('');
+
+  // ── Chart evolución ──
+  if (window._chartEvo) window._chartEvo.destroy();
+  window._chartEvo = new Chart(document.getElementById('chartEvolucion'), {
+    type: 'line',
+    data: {
+      labels: DATA.map(d=>d.mes),
+      datasets: [
+        { label:'Shop', data: DATA.map(d=>d.totalShop), borderColor:'#E8A13D', backgroundColor:'rgba(232,161,61,0.12)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#E8A13D', tension:0.35, fill:true, yAxisID:'yShop' },
+        { label:'Comedor', data: DATA.map(d=>d.totalComedor), borderColor:'#2F6F5E', backgroundColor:'rgba(47,111,94,0.10)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#2F6F5E', tension:0.35, fill:true, yAxisID:'yComedor' }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{ backgroundColor:'#0F2A43', padding:12, titleFont:{family:'IBM Plex Mono'}, bodyFont:{family:'IBM Plex Mono'}, callbacks:{ label:(ctx)=> ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{family:'IBM Plex Mono', size:11}, color:'#5B6B76'} },
+        yShop:{ position:'left', ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#9C6A1B' }, grid:{ color:'#EFEAD9' } },
+        yComedor:{ position:'right', ticks:{ callback:(v)=>fmtM(v), font:{family:'IBM Plex Mono', size:10}, color:'#1E4C3F' }, grid:{ display:false } }
+      }
+    }
+  });
+
+  // ── Chart dona ──
+  if (window._chartTot) window._chartTot.destroy();
+  window._chartTot = new Chart(document.getElementById('chartTotales'), {
+    type: 'doughnut',
+    data:{ labels:['Shop','Comedor'], datasets:[{ data:[totalShop, totalComedor], backgroundColor:['#E8A13D','#2F6F5E'], borderColor:'#fff', borderWidth:3 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{
+        legend:{ position:'bottom', labels:{ font:{family:'IBM Plex Mono', size:11}, color:'#1C2B36', padding:16, usePointStyle:true, pointStyle:'rect' } },
+        tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.label}: ${fmt(ctx.parsed)} (${(ctx.parsed/totalCombinado*100).toFixed(1)}%)` } }
+      }
+    }
+  });
+
+  // ── Participación por mes ──
+  document.getElementById('participacion').innerHTML = DATA.map(d=>{
+    const tot = d.totalShop + d.totalComedor;
+    const pShop = d.totalShop/tot*100;
+    const pCom = 100-pShop;
+    return `
+      <div class="part-row">
+        <div class="part-mes">${d.mes}</div>
+        <div class="part-bar-wrap">
+          <div class="part-bar shop" style="width:${pShop}%"></div>
+          <div class="part-bar comedor" style="width:${pCom}%"></div>
+        </div>
+        <div class="part-pct">${pCom.toFixed(0)}%</div>
+      </div>
+    `;
+  }).join('');
+
+  // ── Tabla ──
+  document.getElementById('tablaBody').innerHTML = DATA.map(d=>`
+    <tr>
+      <td>${d.mes}</td>
+      <td class="shop-col">${fmt(d.shop)}</td>
+      <td class="shop-col">${fmt(d.ivaShop)}</td>
+      <td class="shop-col">${fmt(d.totalShop)}</td>
+      <td class="comedor-col">${fmt(d.comedor)}</td>
+      <td class="comedor-col">${fmt(d.ivaComedor)}</td>
+      <td class="comedor-col">${fmt(d.totalComedor)}</td>
+    </tr>
+  `).join('') + `
+    <tr class="total">
+      <td>Total</td>
+      <td class="shop-col">${fmt(DATA.reduce((a,d)=>a+d.shop,0))}</td>
+      <td class="shop-col">${fmt(DATA.reduce((a,d)=>a+d.ivaShop,0))}</td>
+      <td class="shop-col">${fmt(totalShop)}</td>
+      <td class="comedor-col">${fmt(DATA.reduce((a,d)=>a+d.comedor,0))}</td>
+      <td class="comedor-col">${fmt(DATA.reduce((a,d)=>a+d.ivaComedor,0))}</td>
+      <td class="comedor-col">${fmt(totalComedor)}</td>
+    </tr>
+  `;
+}
+
+cargarDatos();
+</script>
+
+</body>
+</html>
