@@ -31,7 +31,6 @@
   }
   .wrap{max-width:1140px;margin:0 auto;padding:0 24px 80px;}
 
-  /* ── HEADER ─────────────────────────────────────────── */
   header{
     background:var(--navy);
     color:#fff;
@@ -66,7 +65,6 @@
     margin:0;
   }
 
-  /* ── KPI / PUMP DISPLAY ─────────────────────────────── */
   .kpis{
     display:grid;
     grid-template-columns:repeat(4,1fr);
@@ -113,7 +111,6 @@
   .kpi-delta.up{color:#8FD4B0;}
   .kpi-delta.down{color:#E39494;}
 
-  /* ── SECTIONS ────────────────────────────────────────── */
   section{padding:52px 0 0;}
   .section-head{
     display:flex;
@@ -157,7 +154,6 @@
     align-items:stretch;
   }
 
-  /* ── PARTICIPACIÓN LIST ─────────────────────────────── */
   .part-row{
     display:flex;
     align-items:center;
@@ -174,7 +170,6 @@
   .part-bar.comedor{background:var(--comedor);}
   .part-pct{width:44px;text-align:right;color:var(--ink-soft);}
 
-  /* ── TABLE ───────────────────────────────────────────── */
   table{width:100%;border-collapse:collapse;font-size:13px;}
   thead th{
     text-align:right;
@@ -203,7 +198,80 @@
   td.shop-col{color:#9C6A1B;}
   td.comedor-col{color:#1E4C3F;}
 
-  /* ── DESGLOSE POR RUBRO ──────────────────────────────── */
+  /* ── NAVEGACIÓN DE VISTAS (Panel / Cuadro) ────────────── */
+  .vistas-nav{
+    display:flex;
+    gap:8px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:0;
+  }
+  .vista-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:.04em;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    padding:12px 6px;
+    margin-bottom:-1px;
+    border-bottom:2.5px solid transparent;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .vista-btn + .vista-btn{margin-left:18px;}
+  .vista-btn.active{color:var(--navy);border-bottom-color:var(--shop);}
+  .vista-btn:not(.active):hover{color:var(--ink);}
+
+  /* ── CUADRO COMPLETO (tabla tipo planilla) ────────────── */
+  #tablaCuadro{width:100%;border-collapse:collapse;font-size:12.5px;}
+  #tablaCuadro th{
+    text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:0 10px 12px;
+    border-bottom:2px solid var(--ink);
+    white-space:nowrap;
+  }
+  #tablaCuadro th:first-child, #tablaCuadro th:nth-child(2){text-align:left;}
+  #tablaCuadro td{
+    padding:9px 10px;
+    text-align:right;
+    border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  #tablaCuadro td:first-child{text-align:left;}
+  #tablaCuadro td:nth-child(2){text-align:left;color:var(--ink-soft);}
+  #tablaCuadro tr.grupo-header td{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:13.5px;
+    padding-top:20px;
+    border-bottom:2px solid var(--ink);
+    text-transform:uppercase;
+    letter-spacing:.02em;
+  }
+  #tablaCuadro tr.grupo-header.comedor td{color:#1E4C3F;}
+  #tablaCuadro tr.grupo-header.shop td{color:#9C6A1B;}
+  #tablaCuadro tr.subtotal td{
+    font-weight:700;
+    border-top:1.5px solid var(--ink);
+    border-bottom:2px solid var(--line);
+    padding-top:11px;
+    padding-bottom:14px;
+  }
+  #tablaCuadro tr.gran-total td{
+    font-weight:700;
+    font-family:'Fraunces',serif;
+    font-size:14px;
+    border-top:2.5px solid var(--ink);
+    padding-top:16px;
+  }
+
   .tabs{
     display:inline-flex;
     background:#EFEAD9;
@@ -253,7 +321,6 @@
     text-align:right;
   }
 
-  /* ── ANÁLISIS FINANCIERO ─────────────────────────────── */
   .analisis-texto{
     margin:0;
     font-size:14.5px;
@@ -317,7 +384,14 @@
 
   <div id="contenido" style="display:none;">
 
-  <section style="padding-top:36px;">
+  <div class="vistas-nav" style="padding-top:30px;">
+    <button class="vista-btn active" data-vista="panel">📊 Panel</button>
+    <button class="vista-btn" data-vista="cuadro">📋 Cuadro</button>
+  </div>
+
+  <div id="vistaPanel">
+
+  <section style="padding-top:26px;">
     <div class="section-head">
       <h2>Evolución mensual</h2>
       <div class="legend">
@@ -421,6 +495,20 @@
     </div>
   </section>
 
+  </div><!-- /vistaPanel -->
+
+  <div id="vistaCuadro" style="display:none;">
+    <section style="padding-top:26px;">
+      <div class="section-head">
+        <h2>Cuadro completo</h2>
+        <div class="legend"><span style="color:var(--ink-soft);">Valores netos, sin IVA · misma fuente que el panel</span></div>
+      </div>
+      <div class="card" style="overflow-x:auto;">
+        <table id="tablaCuadro" style="min-width:640px;"></table>
+      </div>
+    </section>
+  </div><!-- /vistaCuadro -->
+
   </div>
 
   <footer>
@@ -482,7 +570,6 @@ async function cargarDatos(){
 
     const header = rows[0];
 
-    // Columnas de mes: desde la 3 (índice 2) en adelante, hasta que el header quede vacío
     const monthColsRaw = [];
     for (let c=2; c<header.length; c++){
       const label = (header[c]||'').trim();
@@ -491,7 +578,6 @@ async function cargarDatos(){
     }
     if (!monthColsRaw.length) throw new Error('No se encontraron columnas de mes en el sheet.');
 
-    // Filas de rubro menor
     const rubros = [];
     let lastRubroMayor = '';
     for (let i=1; i<rows.length; i++){
@@ -508,14 +594,12 @@ async function cargarDatos(){
 
     if (!rubros.length) throw new Error('El sheet no tiene filas de rubros reconocibles.');
 
-    // Solo meses con al menos un valor cargado (> 0) en algún rubro
     const mesesConDatos = monthColsRaw.filter(mc => rubros.some(r => r.valores[mc.label] > 0));
     if (!mesesConDatos.length) throw new Error('Ningún mes tiene datos cargados todavía.');
 
     RUBROS = rubros;
     MESES_COLS = mesesConDatos.map(mc => ({ label: mc.label, nombre: nombreMes(mc.label) }));
 
-    // Totales por mes y por rubro mayor (Shop / Comedor)
     const DATA = MESES_COLS.map(mc => {
       const totalShop = rubros.filter(r=>r.rubroMayor==='SHOP').reduce((a,r)=>a+(r.valores[mc.label]||0),0);
       const totalComedor = rubros.filter(r=>r.rubroMayor==='COMEDOR').reduce((a,r)=>a+(r.valores[mc.label]||0),0);
@@ -525,6 +609,8 @@ async function cargarDatos(){
     renderDashboard(DATA);
     renderTabsRubro();
     renderDesglose(RUBRO_ACTIVO);
+    renderCuadro();
+    inicializarNavVistas();
 
     document.getElementById('cargando').style.display = 'none';
     document.getElementById('contenido').style.display = 'block';
@@ -541,7 +627,6 @@ async function cargarDatos(){
   }
 }
 
-// ─── TABS + DESGLOSE POR RUBRO MENOR ────────────────────────────────────────
 function renderTabsRubro(){
   const mayores = [...new Set(RUBROS.map(r=>r.rubroMayor))];
   document.getElementById('tabsRubro').innerHTML = mayores.map(rm => `
@@ -560,7 +645,6 @@ function renderDesglose(rubroMayor){
   const subrubros = RUBROS.filter(r=>r.rubroMayor===rubroMayor);
   const paleta = rubroMayor === 'COMEDOR' ? PALETA_COMEDOR : PALETA_SHOP;
 
-  // Chart stacked por mes
   if (window._chartDesglose) window._chartDesglose.destroy();
   window._chartDesglose = new Chart(document.getElementById('chartDesglose'), {
     type: 'bar',
@@ -586,7 +670,6 @@ function renderDesglose(rubroMayor){
     }
   });
 
-  // Lista de sub-rubros con total y participación
   const totalesSub = subrubros.map((sr,i) => {
     const total = MESES_COLS.reduce((a,m)=>a+(sr.valores[m.label]||0),0);
     return { rubro: sr.rubro, total, color: paleta[i % paleta.length] };
@@ -615,7 +698,6 @@ function renderDashboard(DATA){
   const primerCom = DATA[0].totalComedor, ultimoCom = DATA[DATA.length-1].totalComedor;
   const deltaCom = primerCom === 0 ? 0 : ((ultimoCom-primerCom)/primerCom*100);
 
-  // ── KPIs ──
   const kpis = [
     { idx:'01', label:`Total Shop (${DATA.length} meses)`, value: fmtM(totalShop), cls:'shop', delta:`${deltaShop>=0?'▲':'▼'} ${Math.abs(deltaShop).toFixed(1)}% vs. ${DATA[0].mes}`, dcls: deltaShop>=0?'up':'down' },
     { idx:'02', label:`Total Comedor (${DATA.length} meses)`, value: fmtM(totalComedor), cls:'comedor', delta:`${deltaCom>=0?'▲':'▼'} ${Math.abs(deltaCom).toFixed(1)}% vs. ${DATA[0].mes}`, dcls: deltaCom>=0?'up':'down' },
@@ -630,7 +712,6 @@ function renderDashboard(DATA){
     </div>
   `).join('');
 
-  // ── Chart evolución (un solo eje: Comedor siempre se ve por encima de Shop) ──
   if (window._chartEvo) window._chartEvo.destroy();
   window._chartEvo = new Chart(document.getElementById('chartEvolucion'), {
     type: 'line',
@@ -659,7 +740,6 @@ function renderDashboard(DATA){
     }
   });
 
-  // ── Chart dona ──
   if (window._chartTot) window._chartTot.destroy();
   window._chartTot = new Chart(document.getElementById('chartTotales'), {
     type: 'doughnut',
@@ -673,7 +753,6 @@ function renderDashboard(DATA){
     }
   });
 
-  // ── Participación por mes ──
   document.getElementById('participacion').innerHTML = DATA.map(d=>{
     const tot = d.totalShop + d.totalComedor;
     const pShop = tot===0 ? 0 : d.totalShop/tot*100;
@@ -690,7 +769,6 @@ function renderDashboard(DATA){
     `;
   }).join('');
 
-  // ── Tabla (solo totales) ──
   document.getElementById('tablaBody').innerHTML = DATA.map(d=>`
     <tr>
       <td>${d.mes}</td>
@@ -710,7 +788,6 @@ function renderDashboard(DATA){
   analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partComedor);
 }
 
-// ─── ANÁLISIS FINANCIERO ─────────────────────────────────────────────────
 function media(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
 function desvioEstandar(arr){
   const m = media(arr);
@@ -818,6 +895,65 @@ function analizarFinanzas(DATA, totalShop, totalComedor, totalCombinado, partCom
       }
     }
   });
+}
+
+function inicializarNavVistas(){
+  document.querySelectorAll('.vista-btn').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.vista-btn').forEach(b=>b.classList.toggle('active', b===btn));
+      const vista = btn.dataset.vista;
+      document.getElementById('vistaPanel').style.display = vista === 'panel' ? 'block' : 'none';
+      document.getElementById('vistaCuadro').style.display = vista === 'cuadro' ? 'block' : 'none';
+    });
+  });
+}
+
+function renderCuadro(){
+  const mayores = ['COMEDOR','SHOP'];
+  const cols = MESES_COLS;
+
+  let html = '<thead><tr><th>Rubro Mayor</th><th>Rubro</th>';
+  cols.forEach(c => html += `<th>${c.nombre}</th>`);
+  html += '<th>Total</th></tr></thead><tbody>';
+
+  let granTotalPorMes = cols.map(()=>0);
+  let granTotal = 0;
+
+  mayores.forEach(rm => {
+    const subrubros = RUBROS.filter(r=>r.rubroMayor===rm);
+    if (!subrubros.length) return;
+
+    const claseGrupo = rm === 'COMEDOR' ? 'comedor' : 'shop';
+    html += `<tr class="grupo-header ${claseGrupo}"><td colspan="${cols.length+3}">${rm}</td></tr>`;
+
+    const totalesPorMesGrupo = cols.map(()=>0);
+
+    subrubros.forEach(sr => {
+      let totalFila = 0;
+      html += `<tr><td></td><td>${sr.rubro}</td>`;
+      cols.forEach((c,i) => {
+        const v = sr.valores[c.label] || 0;
+        totalFila += v;
+        totalesPorMesGrupo[i] += v;
+        html += `<td>${fmt(v)}</td>`;
+      });
+      html += `<td style="font-weight:600;">${fmt(totalFila)}</td></tr>`;
+    });
+
+    const totalGrupo = totalesPorMesGrupo.reduce((a,b)=>a+b,0);
+    html += `<tr class="subtotal"><td></td><td>Subtotal ${rm}</td>`;
+    totalesPorMesGrupo.forEach((v,i) => { granTotalPorMes[i] += v; html += `<td>${fmt(v)}</td>`; });
+    html += `<td>${fmt(totalGrupo)}</td></tr>`;
+
+    granTotal += totalGrupo;
+  });
+
+  html += `<tr class="gran-total"><td></td><td>Total General</td>`;
+  granTotalPorMes.forEach(v => html += `<td>${fmt(v)}</td>`);
+  html += `<td>${fmt(granTotal)}</td></tr>`;
+
+  html += '</tbody>';
+  document.getElementById('tablaCuadro').innerHTML = html;
 }
 
 cargarDatos();
