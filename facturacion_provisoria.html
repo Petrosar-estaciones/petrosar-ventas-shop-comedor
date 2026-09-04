@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facturación Provisoria</title>
+<style>
+  :root{
+    --bg:#12181c;
+    --panel:#1a2228;
+    --panel2:#212b32;
+    --line:#2c3944;
+    --ink:#eef3f5;
+    --ink-dim:#9db0ba;
+    --accent:#ef8b4c;
+    --accent-ink:#1a1008;
+    --good:#4caf7d;
+    --bad:#e2604f;
+    --radius:10px;
+    --mono: 'SF Mono', 'Consolas', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  .wrap{max-width:900px;margin:0 auto;padding:14px 14px 60px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;padding:10px 2px 16px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  header h1{font-size:1.05rem;font-weight:700;margin:0;letter-spacing:.2px;}
+  header .sub{font-size:.72rem;color:var(--ink-dim);}
+  .badge{background:var(--accent);color:var(--accent-ink);font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:20px;}
+
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+  .step h2{font-size:.78rem;text-transform:none;letter-spacing:.2px;margin:0 0 10px;color:var(--ink-dim);font-weight:600;display:flex;align-items:center;gap:8px;}
+  .step h2 .n{width:20px;height:20px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:.68rem;color:var(--ink);flex-shrink:0;}
+  .step.done h2 .n{background:var(--good);border-color:var(--good);color:#08150e;}
+  .step.locked{opacity:.45;pointer-events:none;}
+
+  input,select{
+    width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    padding:10px 11px;border-radius:8px;font-size:.9rem;outline:none;
+  }
+  input:focus,select:focus{border-color:var(--accent);}
+  input::placeholder{color:#5c6d78;}
+
+  .resultbox{margin-top:8px;max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel2);}
+  .rrow{padding:9px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.85rem;display:flex;justify-content:space-between;gap:10px;}
+  .rrow:last-child{border-bottom:none;}
+  .rrow:hover{background:#28343c;}
+  .rrow .cod{color:var(--ink-dim);font-size:.72rem;font-family:var(--mono);flex-shrink:0;}
+
+  .selected-card{margin-top:10px;background:var(--panel2);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .selected-card .info b{font-size:.9rem;}
+  .selected-card .info .tag{font-size:.7rem;color:var(--ink-dim);display:block;margin-top:2px;}
+  .selected-card button{background:none;border:1px solid var(--line);color:var(--ink-dim);border-radius:6px;padding:5px 9px;font-size:.72rem;cursor:pointer;}
+  .selected-card button:hover{border-color:var(--bad);color:var(--bad);}
+
+  .emp-status{margin-top:8px;padding:9px 11px;border-radius:8px;font-size:.82rem;display:none;}
+  .emp-status.ok{display:block;background:rgba(76,175,125,.12);border:1px solid var(--good);color:#8fe0b6;}
+  .emp-status.bad{display:block;background:rgba(226,96,79,.12);border:1px solid var(--bad);color:#f2a99c;}
+
+  .discount-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.82rem;color:var(--ink-dim);}
+  .discount-row input{width:70px;flex-shrink:0;text-align:center;}
+
+  .prod-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+  .prod-tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--ink-dim);padding:6px 12px;border-radius:20px;font-size:.75rem;cursor:pointer;}
+  .prod-tabs button.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;}
+  .prow{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:.85rem;gap:8px;cursor:pointer;}
+  .prow:last-child{border-bottom:none;}
+  .prow:hover{background:#28343c;}
+  .prow .pname{flex:1;}
+  .prow .pprice{font-family:var(--mono);color:var(--ink-dim);font-size:.78rem;flex-shrink:0;}
+  .prow .pdisc{color:var(--accent);font-size:.68rem;display:block;}
+
+  table.cart{width:100%;border-collapse:collapse;margin-top:4px;}
+  table.cart th{text-align:left;font-size:.68rem;color:var(--ink-dim);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line);}
+  table.cart td{padding:7px 6px;border-bottom:1px solid var(--line);font-size:.83rem;vertical-align:middle;}
+  table.cart td.num{text-align:right;font-family:var(--mono);white-space:nowrap;}
+  table.cart tr:last-child td{border-bottom:none;}
+  .qtybtn{width:22px;height:22px;border-radius:5px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;font-size:.85rem;line-height:1;}
+  .qtywrap{display:flex;align-items:center;gap:5px;}
+  .qtywrap span{min-width:18px;text-align:center;font-family:var(--mono);}
+  .rmbtn{background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:.9rem;}
+  .rmbtn:hover{color:var(--bad);}
+  .rubro-pill{font-size:.62rem;padding:1px 6px;border-radius:20px;background:var(--panel2);color:var(--ink-dim);border:1px solid var(--line);}
+
+  .totals{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;}
+  .trow{display:flex;justify-content:space-between;font-size:.85rem;padding:3px 0;color:var(--ink-dim);}
+  .trow.grand{font-size:1.15rem;color:var(--ink);font-weight:700;padding-top:8px;border-top:1px dashed var(--line);margin-top:5px;}
+  .trow.desc{color:#f2a99c;}
+
+  .empty{padding:20px;text-align:center;color:var(--ink-dim);font-size:.82rem;}
+
+  .actions{display:flex;gap:8px;margin-top:14px;}
+  .actions button{flex:1;padding:12px;border-radius:8px;border:none;font-size:.88rem;font-weight:700;cursor:pointer;}
+  .btn-primary{background:var(--accent);color:var(--accent-ink);}
+  .btn-secondary{background:var(--panel2);color:var(--ink);border:1px solid var(--line) !important;}
+  .btn-primary:disabled{opacity:.35;cursor:not-allowed;}
+
+  /* Comprobante / print view */
+  #comprobante{display:none;}
+  .comp-wrap{background:#fff;color:#111;border-radius:10px;padding:22px;font-family:var(--mono);font-size:.8rem;}
+  .comp-wrap h3{margin:0 0 2px;font-size:1rem;}
+  .comp-wrap .muted{color:#666;font-size:.72rem;}
+  .comp-wrap table{width:100%;border-collapse:collapse;margin-top:12px;}
+  .comp-wrap th,.comp-wrap td{padding:5px 4px;border-bottom:1px solid #ddd;text-align:left;font-size:.75rem;}
+  .comp-wrap td.num, .comp-wrap th.num{text-align:right;}
+  .comp-wrap .tot{margin-top:10px;text-align:right;font-size:.85rem;}
+  .comp-wrap .tot .g{font-size:1.1rem;font-weight:700;}
+  .comp-actions{display:flex;gap:8px;margin-top:12px;}
+
+  @media print{
+    body *{visibility:hidden;}
+    #comprobante, #comprobante *{visibility:visible;}
+    #comprobante{position:absolute;left:0;top:0;width:100%;display:block !important;}
+    .comp-actions{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+
+  <header>
+    <div>
+      <h1>Facturación provisoria</h1>
+      <div class="sub">Estación de servicio — sistema alternativo mientras no hay conexión</div>
+    </div>
+    <div class="badge" id="dateBadge"></div>
+  </header>
+
+  <!-- PASO 1: CLIENTE -->
+  <div class="step" id="stepCliente">
+    <h2><span class="n">1</span> Cliente</h2>
+    <input type="text" id="clienteSearch" placeholder="Buscar cliente por código o nombre..." autocomplete="off">
+    <div class="resultbox" id="clienteResults" style="display:none;"></div>
+    <div class="selected-card" id="clienteSelected" style="display:none;">
+      <div class="info">
+        <b id="clienteNombre"></b>
+        <span class="tag">Código <span id="clienteCod"></span></span>
+      </div>
+      <button onclick="resetCliente()">Cambiar</button>
+    </div>
+  </div>
+
+  <!-- PASO 2: EMPLEADO (solo si CONSUMIDOR FINAL EMPLEADOS) -->
+  <div class="step locked" id="stepEmpleado">
+    <h2><span class="n">2</span> Legajo del empleado</h2>
+    <input type="text" id="legajoSearch" placeholder="Buscar por legajo o apellido..." autocomplete="off">
+    <div class="resultbox" id="legajoResults" style="display:none;"></div>
+    <div class="selected-card" id="legajoSelected" style="display:none;">
+      <div class="info">
+        <b id="legajoNombre"></b>
+        <span class="tag">Legajo <span id="legajoNum"></span> · <span id="legajoEstado"></span></span>
+      </div>
+      <button onclick="resetLegajo()">Cambiar</button>
+    </div>
+    <div class="emp-status" id="empStatus"></div>
+    <div class="discount-row" id="descuentoRow" style="display:none;">
+      Descuento empleado en Comedor y Bebidas:
+      <input type="number" id="descuentoPct" value="20" min="0" max="100" onchange="renderCart()">
+      <span>%</span>
+    </div>
+  </div>
+
+  <!-- PASO 3: PRODUCTOS -->
+  <div class="step locked" id="stepProductos">
+    <h2><span class="n">3</span> Artículos</h2>
+    <input type="text" id="prodSearch" placeholder="Buscar artículo..." autocomplete="off">
+    <div class="prod-tabs" id="prodTabs"></div>
+    <div class="resultbox" id="prodResults" style="max-height:280px;"></div>
+  </div>
+
+  <!-- PASO 4: CARRITO -->
+  <div class="step locked" id="stepCarrito">
+    <h2><span class="n">4</span> Detalle de la venta</h2>
+    <div id="cartArea"><div class="empty">Todavía no agregaste artículos.</div></div>
+    <div class="totals" id="totalsArea" style="display:none;">
+      <div class="trow"><span>Subtotal</span><span id="tSubtotal">$0</span></div>
+      <div class="trow desc" id="tDescRow" style="display:none;"><span id="tDescLabel">Descuento empleado</span><span id="tDesc">-$0</span></div>
+      <div class="trow grand"><span>Total</span><span id="tTotal">$0</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn-secondary" onclick="vaciarCarrito()">Vaciar</button>
+      <button class="btn-primary" id="btnFacturar" onclick="mostrarComprobante()" disabled>Generar comprobante</button>
+    </div>
+  </div>
+
+  <!-- COMPROBANTE -->
+  <div class="step" id="stepComprobante" style="display:none;">
+    <h2><span class="n">✓</span> Comprobante provisorio</h2>
+    <div id="comprobante">
+      <div class="comp-wrap" id="compInner"></div>
+    </div>
+    <div class="comp-actions">
+      <button class="btn-secondary" style="flex:1;padding:12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="window.print()">Imprimir / PDF</button>
+      <button class="btn-secondary" style="flex:1;padding:12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="nuevaVenta()">Nueva venta</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DATA = {"productos": [{"rubro": "COMEDOR", "nombre": "ADICIONAL HUEVO", "precio": 1400.0}, {"rubro": "COMEDOR", "nombre": "AGUA PARA TERMO", "precio": 500.0}, {"rubro": "COMEDOR", "nombre": "ALBONDIGAS CON PURE DE PAPAS", "precio": 20900.0}, {"rubro": "COMEDOR", "nombre": "CAFE DOBLE", "precio": 5000.0}, {"rubro": "COMEDOR", "nombre": "CAFE C/LECHE DOBLE", "precio": 5000.0}, {"rubro": "COMEDOR", "nombre": "CAFE GRANDE MUG", "precio": 5500.0}, {"rubro": "COMEDOR", "nombre": "CAFE JARRITO", "precio": 4200.0}, {"rubro": "COMEDOR", "nombre": "CAFE P/LLEVAR CHICO", "precio": 4500.0}, {"rubro": "COMEDOR", "nombre": "CAFE P/LLEVAR GRANDE", "precio": 5500.0}, {"rubro": "COMEDOR", "nombre": "CANELONES C/ BOLOGNESA", "precio": 19800.0}, {"rubro": "COMEDOR", "nombre": "EMPANADA CARNE P/UNIDAD", "precio": 3100.0}, {"rubro": "COMEDOR", "nombre": "EMPANADA DE POLLO P/UNIDAD", "precio": 3100.0}, {"rubro": "COMEDOR", "nombre": "EMPANADA JAMON Y QUESO P/UNIDAD", "precio": 3100.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA COMPLETA", "precio": 6000.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA DE FRUTAS", "precio": 6500.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA ESPECIAL", "precio": 12400.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA LECHUGA Y TOMATE", "precio": 5800.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA MIXTA", "precio": 5800.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA TOMATE Y CEBOLLA", "precio": 5800.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA TOMATE Y HUEVO", "precio": 5800.0}, {"rubro": "COMEDOR", "nombre": "ENSALADA ZAN Y HUE", "precio": 5800.0}, {"rubro": "COMEDOR", "nombre": "ESCALOPE A LA ROMANA", "precio": 18400.0}, {"rubro": "COMEDOR", "nombre": "ESTOFADO DE CARNE", "precio": 20000.0}, {"rubro": "COMEDOR", "nombre": "FACTURAS POR UNIDAD", "precio": 1000.0}, {"rubro": "COMEDOR", "nombre": "FLAN C/CREMA", "precio": 7200.0}, {"rubro": "COMEDOR", "nombre": "FLAN C/DDL", "precio": 6500.0}, {"rubro": "COMEDOR", "nombre": "GELATINA", "precio": 2500.0}, {"rubro": "COMEDOR", "nombre": "MEDIALUNA C/JAMON Y QUESO", "precio": 3500.0}, {"rubro": "COMEDOR", "nombre": "MERLUZA A LA ROMANA", "precio": 16900.0}, {"rubro": "COMEDOR", "nombre": "MIGA JAM/QUE", "precio": 7100.0}, {"rubro": "COMEDOR", "nombre": "MILANESA", "precio": 16800.0}, {"rubro": "COMEDOR", "nombre": "MILANESA A LA SUIZA", "precio": 20500.0}, {"rubro": "COMEDOR", "nombre": "NAPOLITANA", "precio": 22200.0}, {"rubro": "COMEDOR", "nombre": "PAPAS FRITAS PORCION", "precio": 6100.0}, {"rubro": "COMEDOR", "nombre": "PAPAS RUSTICAS AL HORNO", "precio": 5700.0}, {"rubro": "COMEDOR", "nombre": "PASTEL DE PAPA", "precio": 18900.0}, {"rubro": "COMEDOR", "nombre": "PECHUGA A LA PLANCHA", "precio": 11100.0}, {"rubro": "COMEDOR", "nombre": "PECHUGA A LA SUIZA", "precio": 12300.0}, {"rubro": "COMEDOR", "nombre": "PIZZA ESPECIAL JAM/MUZ", "precio": 19000.0}, {"rubro": "COMEDOR", "nombre": "POTAJE DE LENTEJA", "precio": 16500.0}, {"rubro": "COMEDOR", "nombre": "PROMO !! FLAN MIXTO!", "precio": 7500.0}, {"rubro": "COMEDOR", "nombre": "PROMO NAPO+FRITAS", "precio": 19500.0}, {"rubro": "COMEDOR", "nombre": "PURE DE PAPA", "precio": 5700.0}, {"rubro": "COMEDOR", "nombre": "RAVIOLES C/SALSA BOLGNESA", "precio": 21000.0}, {"rubro": "COMEDOR", "nombre": "SANDWICH CHICO DE MILA COMPLETO", "precio": 17500.0}, {"rubro": "COMEDOR", "nombre": "SANDWICH CHICO SUPREMA COMPLETO", "precio": 17500.0}, {"rubro": "COMEDOR", "nombre": "SANDWICH DE JAMON Y QUESO", "precio": 7100.0}, {"rubro": "COMEDOR", "nombre": "SORRENTINOS C/SALSA BOLOGNESA", "precio": 21000.0}, {"rubro": "COMEDOR", "nombre": "SUBMARINO", "precio": 8000.0}, {"rubro": "COMEDOR", "nombre": "SUPREMA", "precio": 12200.0}, {"rubro": "COMEDOR", "nombre": "SUPREMA A LA NAPOLITANA", "precio": 16900.0}, {"rubro": "COMEDOR", "nombre": "SUPREMA A LA SUIZA", "precio": 13800.0}, {"rubro": "COMEDOR", "nombre": "TALLARINES C/SALSA BOLOGNESA", "precio": 19700.0}, {"rubro": "COMEDOR", "nombre": "TE", "precio": 3800.0}, {"rubro": "COMEDOR", "nombre": "TORTA FRITA C/U", "precio": 1200.0}, {"rubro": "COMEDOR", "nombre": "VACIO AL HORNO", "precio": 29000.0}, {"rubro": "TIENDA", "nombre": "9 DE ORO AGRIDULCES X 200GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "9 DE ORO AZUCARADOS X2 210 GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "9 DE ORO BIZCOCHOS CLASICOS X200GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "9 DE ORO CRUJITAS X120G", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "9 DE ORO SCONCITOS X 200G", "precio": 2500.0}, {"rubro": "BEBIDAS", "nombre": "AGUA BENEDECTINO X 1.5L", "precio": 3600.0}, {"rubro": "BEBIDAS", "nombre": "AGUA BENEDECTINO X 500 CC", "precio": 2000.0}, {"rubro": "BEBIDAS", "nombre": "AGUA CON GAS X 1.5", "precio": 3800.0}, {"rubro": "BEBIDAS", "nombre": "AGUA CON GAS X 500CC", "precio": 2100.0}, {"rubro": "BEBIDAS", "nombre": "AGUA ECO DE LOS ANDES X 1 LT ONE", "precio": 3600.0}, {"rubro": "BEBIDAS", "nombre": "AGUA ECO DE LOS ANDES X 1.5LT", "precio": 3600.0}, {"rubro": "BEBIDAS", "nombre": "AGUA ECO DE LOS ANDES X 500CC", "precio": 2000.0}, {"rubro": "BEBIDAS", "nombre": "AGUA IVESS MANZANA X 500CC", "precio": 2400.0}, {"rubro": "BEBIDAS", "nombre": "AGUA IVESS NARANJA X 500CC", "precio": 2400.0}, {"rubro": "BEBIDAS", "nombre": "AGUA IVESS SPORT X750ML", "precio": 3582.0}, {"rubro": "BEBIDAS", "nombre": "AGUA IVESS X 1.5 L", "precio": 3000.0}, {"rubro": "BEBIDAS", "nombre": "AGUA SABORIZADA IVESS CITRUS X 1.5L", "precio": 4200.0}, {"rubro": "BEBIDAS", "nombre": "AGUA SABORIZADA IVESS LEMON X 1.5L", "precio": 4200.0}, {"rubro": "BEBIDAS", "nombre": "AGUA SABORIZADA IVESS MANZANA X 1.5L", "precio": 4200.0}, {"rubro": "BEBIDAS", "nombre": "AGUA VILLAV S/G X 500CC", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR BYN BLANCO TRIPLE X 73GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR BYN NEGRO TRIPLE X73GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR COFLER BLOCK X60GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR FANTOCHE TRIPLE X85", "precio": 2400.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR FANTOCHE TRIPLE X85GR BLANCO", "precio": 2400.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR GUAYMALLEN BLANCO TRIPLE X70GR", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR GUAYMALLEN NEGRO TRIPLE X70GR", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR GUAYMALLEN NEGRO X 38GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR MINITORTA AGUILA COCOX70.5GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR MINITORTA BLANCO X69GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR MINITORTA BROWNIE X71.5GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR MINITORTA CLASICO X 69GR TRIPLE", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR TOFI BLANCO X73GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "ALFAJOR TRIPLE BON O BON NEGROX60GR", "precio": 2600.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS LIMONADA X 1.5 LT", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS LIMONADA X 500ML", "precio": 2500.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS MANZANA X 1.5 LT", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS MANZANA X 500CC", "precio": 2500.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS NARANJA X 1.5LT", "precio": 5500.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS PERA X 1.5LTS", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS PERA X 500 ML", "precio": 2500.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS POMELO X 1.5LT", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS POMELO X 500CC", "precio": 2500.0}, {"rubro": "BEBIDAS", "nombre": "AQUARIUS UVA VERDE X500CC", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "BARRA CEREAL MIX PISTACHO Y MANI X38G", "precio": 1800.0}, {"rubro": "TIENDA", "nombre": "BARRA CEREAL MUECAS BANANA/DDL", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "BARRA CEREAL MUECAS PASAS/ALMENDRAS", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "BARRA CHOCOLINAS X40GR", "precio": 2100.0}, {"rubro": "TIENDA", "nombre": "BARRA COFLER COCO X 40GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "BARRA COFLER DUBAI", "precio": 4500.0}, {"rubro": "BEBIDAS", "nombre": "BON AQUA X 500CC", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "BON O BON BLANCO X 15GR", "precio": 1000.0}, {"rubro": "TIENDA", "nombre": "BON O BON LECHE X16GR", "precio": 1000.0}, {"rubro": "TIENDA", "nombre": "CACHAFAZ AVE/ALM/MANI X 225GR", "precio": 4800.0}, {"rubro": "TIENDA", "nombre": "CACHAFAZ AVENA Y CHIPS X225GR", "precio": 4800.0}, {"rubro": "TIENDA", "nombre": "CACHAFAZ AVENA Y PASAS X225GR", "precio": 4800.0}, {"rubro": "TIENDA", "nombre": "CARAMELOS BUTTER FRACCIONADOS", "precio": 3500.0}, {"rubro": "BEBIDAS", "nombre": "CEPITA ANANA MANDARINA", "precio": 4100.0}, {"rubro": "BEBIDAS", "nombre": "CEPITA ANANA X 1LT", "precio": 4100.0}, {"rubro": "BEBIDAS", "nombre": "CEPITA DURAZNO X 1LT", "precio": 4100.0}, {"rubro": "BEBIDAS", "nombre": "CEPITA MANZANA X 1LT", "precio": 4100.0}, {"rubro": "BEBIDAS", "nombre": "CEPITA NARANJA X 1LT", "precio": 4100.0}, {"rubro": "TIENDA", "nombre": "CEREAL FORT FRUTILLA MANZANA", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL FORT FRUTILLA/CHOCO BCOX19GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL FORT FRUTILLA/CHOCOLATE X26GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL FORT X23GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL MIX PASION CHOCOLATE X23GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL MIX LIGHT MANZANA/AVENA X23GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "CEREAL MIX SEMILLAS Y CHIPS X 207GR", "precio": 3900.0}, {"rubro": "TIENDA", "nombre": "CEREAL MIX YOGHURT/FRU LIGHT X26GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREAL MIX YOGHURT/FRUTILLA X26GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "CEREALITAS CLASICA X 207GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "CHOC. MECANO BONAFIDE", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "CHOCOLATE BLANCO TOFI 27 GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "CHOCOLATE TOFI 28GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "CHOCOLINAS X 100GR", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "CHUPETIN EVOLUTION SURTIDO X18GR", "precio": 500.0}, {"rubro": "TIENDA", "nombre": "CHUPETIN MISTER POPS FRUTAL X12.5GR", "precio": 200.0}, {"rubro": "BEBIDAS", "nombre": "CITRIC NARANJA X 1LT", "precio": 6800.0}, {"rubro": "BEBIDAS", "nombre": "CITRIC NARANJA X 500CC", "precio": 4000.0}, {"rubro": "BEBIDAS", "nombre": "COCA COLA S/A 1500 CC", "precio": 5800.0}, {"rubro": "BEBIDAS", "nombre": "COCA COLA S/A X 500CC", "precio": 2800.0}, {"rubro": "BEBIDAS", "nombre": "COCA COLA X 1500", "precio": 5800.0}, {"rubro": "BEBIDAS", "nombre": "COCA COLA X 500 CC", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "COFLER BLOCK BLANCO C/MANI X 38GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "COFLER BLOCK LEC/MANI X 38GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "COFLER EXTRA CHOCOTORTA X46GR", "precio": 3800.0}, {"rubro": "TIENDA", "nombre": "COFLER EXTRA COOKIES Y CREMA", "precio": 3800.0}, {"rubro": "TIENDA", "nombre": "COFLER OBLEA GRAFFITI BLANCO X45GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "COFLER OBLEA GRAFFITI X 45GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "COFLER RELLENO DDL X46GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "COFLER RELLENO FRUTILLA YOGHURTX35G", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "COQUITAS X 260GR", "precio": 3800.0}, {"rubro": "TIENDA", "nombre": "CRIOLLITAS MAS GRANDES X169GR", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "DELUXE BAÑADA CON LIMON", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "DELUXE BAÑADAS CON CHOCOLATE", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "DELUXE BAÑADAS CON CHOCOLATE BLANCO", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "DELUXE BAÑADAS CON DDL SIN GLUTEN", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "DELUXE BAÑADAS CON FRUTILLA", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "DOS CORAZONES X 26GR", "precio": 2100.0}, {"rubro": "TIENDA", "nombre": "DOYPACK ALMENDRAS X200GR", "precio": 10400.0}, {"rubro": "TIENDA", "nombre": "DOYPACK MIX PREMIUM 300GR", "precio": 16000.0}, {"rubro": "TIENDA", "nombre": "DOYPACK MIX PREMIUM X 180 GR", "precio": 9600.0}, {"rubro": "TIENDA", "nombre": "DOYPACK NUECES X150GR", "precio": 7550.0}, {"rubro": "TIENDA", "nombre": "EPA CRUNCHY X 88GR", "precio": 7500.0}, {"rubro": "TIENDA", "nombre": "EPA DDL MAX X 88GR", "precio": 7500.0}, {"rubro": "TIENDA", "nombre": "EPA ROCKER X 88GR", "precio": 7000.0}, {"rubro": "BEBIDAS", "nombre": "FANTA X 1500 CC", "precio": 5800.0}, {"rubro": "BEBIDAS", "nombre": "FANTA X 500CC", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "FEELING FELFORT X20G", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "GALLETITA CEREAL MIX AVENA/PASS X 207GR", "precio": 3700.0}, {"rubro": "TIENDA", "nombre": "GALLETITA CEREAL MIX FRUTILLA/CHIA X207G", "precio": 3700.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS CEREAL MIX AVENA/CHOC X207GR", "precio": 3700.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS DE CACAO Y MANI CELIENERGY", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS DE NUEZ CELIENERGY", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS DE NUEZ CON CHOCOLATE BCO", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS ORGANICAS CACHAFAZ AVE/MIEL", "precio": 4100.0}, {"rubro": "TIENDA", "nombre": "GALLETITAS ORGANICAS CACHAFAZ CACAO/MIEL", "precio": 4100.0}, {"rubro": "TIENDA", "nombre": "GOMA MISKY 30GR", "precio": 800.0}, {"rubro": "TIENDA", "nombre": "HELADO LA FRUTA FRUTILLA", "precio": 3600.0}, {"rubro": "TIENDA", "nombre": "KESITAS ESTUCHE X125GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "LATA ALMENDRAS X 130G", "precio": 7800.0}, {"rubro": "TIENDA", "nombre": "LATA MIX PREMIUM X100GR", "precio": 6400.0}, {"rubro": "TIENDA", "nombre": "LATA NUECES X 80GR", "precio": 6100.0}, {"rubro": "BEBIDAS", "nombre": "LEVITE MANZANA X 1500CC", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "LEVITE MANZANA X 500CC", "precio": 3000.0}, {"rubro": "BEBIDAS", "nombre": "LEVITE PERA X 500CC", "precio": 3000.0}, {"rubro": "BEBIDAS", "nombre": "LEVITE POMELO X 1500CC", "precio": 5600.0}, {"rubro": "BEBIDAS", "nombre": "LEVITE POMELO X 500CC", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "MANA CHO/VAI X 152 GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "MANA LIMON X 152GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "MANA VAI/FRU X 152GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "MARROC - CABSHA", "precio": 1200.0}, {"rubro": "TIENDA", "nombre": "MEDALLON DULCE DE LECHE FELFORT X21GR", "precio": 1600.0}, {"rubro": "TIENDA", "nombre": "MELITAS X 159GR", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "MELLIZAS X 112GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS ACIDOS MANZANA X 28G", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS ACIDOS NARANJA X28GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS CAFE LATTE X28GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS CHERRY X29.4GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS MENTA X29.4G", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS MENTOL X29.4GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS MIEL X29GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS S/A MENTOL X26.6GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS S/A ZERO CHERY X26.6GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS STRONG X29.4GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTHOPLUS VIT LIMON X29.4GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MENTITAS FELFORT X16GR", "precio": 1000.0}, {"rubro": "TIENDA", "nombre": "MISKI ROLLO X35G", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "MOGUL JELLY BEANS X50GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MOGUL MORAS X50GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "MOGUL ROLLO EXTREME ACIDOS X35GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "MOGUL ROLLO FRUTALES X35GR", "precio": 1300.0}, {"rubro": "TIENDA", "nombre": "OBLEA BON O BON BLANCA X30GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "OBLEA BON O BON LECHE X30 GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "OBLEA COFLER BLOCK MAX X 60GR", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "OBLEA OPERA SIMPLE X 92GR", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "PASTILLAS DRF MENTA-ANIS-MENTOL", "precio": 1000.0}, {"rubro": "TIENDA", "nombre": "PORTEÑITAS X 139GR", "precio": 2400.0}, {"rubro": "TIENDA", "nombre": "PRINGLES CREMA Y CEBOLLA X 40GR", "precio": 3300.0}, {"rubro": "TIENDA", "nombre": "PRINGLES ORIGINAL X 37GR", "precio": 3300.0}, {"rubro": "TIENDA", "nombre": "REX BOLSA X 75GR", "precio": 2100.0}, {"rubro": "TIENDA", "nombre": "REX ESTUCHE X125GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "RHODESIA X22GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "ROCKLETS CHOC CONFITADOS X 40 GR", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "RUMBA X108GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "SALADIX CALABRESA X 100GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "SALADIX DUO JAM/QUE X 80GR", "precio": 2500.0}, {"rubro": "TIENDA", "nombre": "SALADIX JAMON X 100GR", "precio": 2600.0}, {"rubro": "TIENDA", "nombre": "SALADIX PIZZA 100 GR", "precio": 2600.0}, {"rubro": "BEBIDAS", "nombre": "SCHWEPPES CITRUS X 1.5 LT", "precio": 5900.0}, {"rubro": "BEBIDAS", "nombre": "SCHWEPPES POMELO 1.5 LT", "precio": 5900.0}, {"rubro": "BEBIDAS", "nombre": "SCHWEPPES POMELO X 500CC", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "SERRANITAS SANDWICH X112GR", "precio": 2000.0}, {"rubro": "TIENDA", "nombre": "SLICE LIMON X70CC", "precio": 2200.0}, {"rubro": "TIENDA", "nombre": "SNACK PAPAS CREMA/CEBOLLA X 75GR", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "SNACK PAPAS ORIGINAL X 80 GR", "precio": 5200.0}, {"rubro": "TIENDA", "nombre": "SONRISAS X108GR", "precio": 2600.0}, {"rubro": "BEBIDAS", "nombre": "SPEED X 250ML", "precio": 3800.0}, {"rubro": "BEBIDAS", "nombre": "SPRITE X 1500 CC", "precio": 5900.0}, {"rubro": "BEBIDAS", "nombre": "SPRITE X 500 CC", "precio": 2800.0}, {"rubro": "TIENDA", "nombre": "SURTIDO BAGLEY X 398 GR", "precio": 5200.0}, {"rubro": "TIENDA", "nombre": "SURTIDO DIVERSION X 398 GR", "precio": 4500.0}, {"rubro": "TIENDA", "nombre": "SURTIDO LIA X400G", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "TATIN BLANCO X38GR", "precio": 1200.0}, {"rubro": "TIENDA", "nombre": "TATIN NEGRO X 33GR", "precio": 1200.0}, {"rubro": "TIENDA", "nombre": "TIVIS FELFORT X25GR", "precio": 1800.0}, {"rubro": "TIENDA", "nombre": "TOP 7 BUBBLE FUN X14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP 7 ULTRA AZUL CLEAN MINT X24GR", "precio": 3200.0}, {"rubro": "TIENDA", "nombre": "TOP 7 ULTRA VERDE GREEN MINT X24GR", "precio": 3200.0}, {"rubro": "TIENDA", "nombre": "TOP 7 VIOLET CHERRY X14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP 7 XPLOS MANDARINA X 14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP 7 XPLOS MINT X 14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP 7 XPLOS STRAWBERRY X14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP 7 XPLOS STRONG X 14 GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TOP X PLOS SANDIA X 14GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TRAVIATA KESITAS X96GR", "precio": 1500.0}, {"rubro": "TIENDA", "nombre": "TRIO CHOCOLATINA X 300GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "TRIO FROLITAS X 300GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO MARQUISE DE CHOCOLATE X 300GR", "precio": 3600.0}, {"rubro": "TIENDA", "nombre": "TRIO PEPAS ALEMANAS X300GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO PEPAS BATATA X 300GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO PEPAS GLASEADAS X 350GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO SCONS X 350GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO TARTELETTE FRUTOS DEL BOSQUE X300GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO TARTELETTE X/FRUTILLA X300GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO TRI CHOC X300GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "TRIO TRICHIPS DDL X-ARCOIRIS 200GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO TRICHISPAS BLANCAS X230GR", "precio": 3000.0}, {"rubro": "TIENDA", "nombre": "TRIO VARIETTE SURTIDAS X360GR", "precio": 3500.0}, {"rubro": "TIENDA", "nombre": "TURRON X 25GR", "precio": 600.0}, {"rubro": "TIENDA", "nombre": "YERBA MAÑANITA X 500GR", "precio": 4000.0}, {"rubro": "TIENDA", "nombre": "YERBA PIPORE SUAVE X 500GR", "precio": 3800.0}], "clientes": [{"cod": "0", "nombre": "CONSUMIDOR FINAL"}, {"cod": "3", "nombre": "PECOM SERVICIOS ENERGIA SA"}, {"cod": "10", "nombre": "ARGENTINA RUSTICA SRL"}, {"cod": "51", "nombre": "SGA SERVICIOS SOCIEDAD ANONIMA"}, {"cod": "264", "nombre": "HIDROAR S.A"}, {"cod": "855", "nombre": "ENERPETROL S.R.L."}, {"cod": "883", "nombre": "BURGWARDT Y CIA. S.A."}, {"cod": "1058", "nombre": "CONSUMIDOR FINAL EMPLEADOS"}, {"cod": "1115", "nombre": "COP BS. AS. S.R.L."}, {"cod": "1312", "nombre": "NOVA ENERGY ARGENTINA LTD. SUCURSAL ARGENTINA"}, {"cod": "1359", "nombre": "EIFA SRL"}, {"cod": "1382", "nombre": "ELECTRO PATAGONIA S.A"}, {"cod": "1458", "nombre": "FAS FORESTAL SRL"}, {"cod": "1463", "nombre": "FEADAR S.A."}, {"cod": "1612", "nombre": "HDM SERVICIO HIDRO SRL"}, {"cod": "1614", "nombre": "HECTOR V LOSI Y CIA S.R.L"}, {"cod": "1721", "nombre": "INNOVISION S.A."}, {"cod": "1883", "nombre": "JARA SANTOS ALADINO"}, {"cod": "1887", "nombre": "JD S.R.L."}, {"cod": "1892", "nombre": "JINBER S.R.L."}, {"cod": "2112", "nombre": "MERO SA"}, {"cod": "2268", "nombre": "NOVOMET ARGENTINA SA"}, {"cod": "2325", "nombre": "PALMERO SAN LUIS S.A"}, {"cod": "2833", "nombre": "ZOXI SA"}, {"cod": "2870", "nombre": "VIENTOS DEL SUR SRL"}, {"cod": "2968", "nombre": "VERMAZ"}, {"cod": "2982", "nombre": "BAKER HUGHES ARG SRL"}, {"cod": "3253", "nombre": "MICRACEL SA"}, {"cod": "3639", "nombre": "EDENRED ARGENTINA SOCIEDAD ANONIMA"}, {"cod": "4004", "nombre": "MANPETROL S.A."}, {"cod": "4013", "nombre": "MARBAR S.A."}, {"cod": "4600", "nombre": "RECTIF MAINTENANCE AND SERVICE SRL"}, {"cod": "4903", "nombre": "QUATTROCHI RICARDO WALTER"}, {"cod": "4922", "nombre": "LOGISTICA DELTA SA"}, {"cod": "4931", "nombre": "VENVER S.A."}, {"cod": "5174", "nombre": "COPESA COMPANIA CONSTRUCTORA Y PETROLERA S.A."}, {"cod": "5229", "nombre": "CORPORACION AFILIADA DEL SUR S.A."}, {"cod": "5238", "nombre": "H F COMUNICACIONES S.R.L"}, {"cod": "5313", "nombre": "VILLALBA LUIS SEBASTIAN"}, {"cod": "5340", "nombre": "POLYAR S.A.C.I.F."}, {"cod": "5402", "nombre": "PETROMARK SRL"}, {"cod": "5444", "nombre": "SAN ANTONIO INTERNACIONAL SRL"}, {"cod": "5449", "nombre": "SALAMANCA S.R.L."}, {"cod": "5478", "nombre": "RECO SA"}, {"cod": "5488", "nombre": "DA VENETO SRL"}, {"cod": "5541", "nombre": "CAZALLA MATERIALES S.R.L."}, {"cod": "5565", "nombre": "FARIÑA SRL"}], "empleados": [{"legajo": "18", "nombre": "PEREZ TREVISAN, RICARDO JOSE", "estado": "Activo"}, {"legajo": "55", "nombre": "SOLIS, HUGO MARCELO", "estado": "Activo"}, {"legajo": "59", "nombre": "OGAS, GUSTAVO JAVIER", "estado": "Activo"}, {"legajo": "71", "nombre": "LLANQUIN, PABLO GABRIEL", "estado": "Activo"}, {"legajo": "86", "nombre": "FARIAS, ROSENDO RAUL", "estado": "Activo"}, {"legajo": "89", "nombre": "CERDA, RENE SEBASTIAN", "estado": "Activo"}, {"legajo": "91", "nombre": "SALDIVIA ALARCON, VICTOR ARMANDO", "estado": "Activo"}, {"legajo": "100", "nombre": "QUIDULEF, JULIAN ALBERTO", "estado": "Activo"}, {"legajo": "106", "nombre": "VALERA, EDGARDO GUSTAVO", "estado": "Activo"}, {"legajo": "126", "nombre": "CAYUPEL, LUIS ALBERTO", "estado": "Activo"}, {"legajo": "146", "nombre": "BUSTAMANTE, JOSE VICENTE", "estado": "Activo"}, {"legajo": "154", "nombre": "BORDA, WALTER DAVID", "estado": "Activo"}, {"legajo": "164", "nombre": "BARON, ALEJANDRO DANIEL", "estado": "Activo"}, {"legajo": "184", "nombre": "SALGAO, HECTOR EDUARDO", "estado": "Activo"}, {"legajo": "186", "nombre": "GONZALEZ, DANIEL OCTAVIO", "estado": "Activo"}, {"legajo": "200", "nombre": "FUENTES, WALTER OMAR", "estado": "Activo"}, {"legajo": "206", "nombre": "CABRAL, HUGO ALBERTO", "estado": "Activo"}, {"legajo": "211", "nombre": "MORALES, PABLO ANDRES", "estado": "Activo"}, {"legajo": "227", "nombre": "DESPO, FABIAN HUMBERTO", "estado": "Activo"}, {"legajo": "229", "nombre": "GONZALORENA, CEFERINO", "estado": "Activo"}, {"legajo": "231", "nombre": "GALARZA, JUAN PABLO", "estado": "Activo"}, {"legajo": "239", "nombre": "FLEITAS, DANIEL ALBERTO", "estado": "Activo"}, {"legajo": "241", "nombre": "ALVAREZ, GERARDO ADRIAN", "estado": "Activo"}, {"legajo": "250", "nombre": "QUIDULEF, HORACIO JAVIER", "estado": "Activo"}, {"legajo": "252", "nombre": "GONZALEZ, LEONARDO JOSE", "estado": "Activo"}, {"legajo": "254", "nombre": "MINOLI, ADRIAN OSCAR", "estado": "Activo"}, {"legajo": "256", "nombre": "RIOS, DAVID ANDRES", "estado": "Activo"}, {"legajo": "262", "nombre": "CHAURA, JAVIER ENRIQUE", "estado": "Activo"}, {"legajo": "268", "nombre": "KAGANOWSKY, VICTOR DAVID", "estado": "Activo"}, {"legajo": "274", "nombre": "GONZALEZ, ALEJANDRO LEONARDO", "estado": "Activo"}, {"legajo": "278", "nombre": "RUSSOMANDO, ROQUE PASCUAL", "estado": "Activo"}, {"legajo": "279", "nombre": "PAZ, JOSE ANDRES", "estado": "Activo"}, {"legajo": "280", "nombre": "PIERONI, ENRIQUE HORACIO", "estado": "Activo"}, {"legajo": "296", "nombre": "SANDRINI, HUGO ALBERTO", "estado": "Activo"}, {"legajo": "300", "nombre": "SAN MARTIN, JULIO CESAR", "estado": "Activo"}, {"legajo": "310", "nombre": "AINOL, JORGE MAURICIO", "estado": "Activo"}, {"legajo": "315", "nombre": "LINCOPIL, SERGIO LUCIANO", "estado": "Activo"}, {"legajo": "316", "nombre": "OJEDA SERON, GALO HERNAN", "estado": "Activo"}, {"legajo": "317", "nombre": "BENEGAS, GABRIEL AGUSTIN", "estado": "Activo"}, {"legajo": "326", "nombre": "PRIETO, MARCELO EDUARDO", "estado": "Activo"}, {"legajo": "327", "nombre": "PICUNI, HIPOLITO", "estado": "Activo"}, {"legajo": "328", "nombre": "CARDENAS, CRISTIAN ANDRES", "estado": "Activo"}, {"legajo": "329", "nombre": "GARRIDO, FERNANDO MARTIN", "estado": "Activo"}, {"legajo": "330", "nombre": "GONZALORENA, VICTOR ESTEBAN", "estado": "Activo"}, {"legajo": "332", "nombre": "HERRERO, MAURO RAMIRO", "estado": "Activo"}, {"legajo": "336", "nombre": "KRUGER, PABLO ALBERTO", "estado": "Activo"}, {"legajo": "337", "nombre": "QUILIÑAN, PAULO ANDRES", "estado": "Activo"}, {"legajo": "343", "nombre": "BACARILI, JULIO CESAR", "estado": "Activo"}, {"legajo": "347", "nombre": "CARAZO, ELBA MARCELA", "estado": "Activo"}, {"legajo": "351", "nombre": "MERCADO, MARCELO DANIEL", "estado": "Activo"}, {"legajo": "352", "nombre": "GAJARDO, MAURICIO JAVIER", "estado": "Activo"}, {"legajo": "354", "nombre": "ALVAREZ, DIEGO DAVID", "estado": "Activo"}, {"legajo": "359", "nombre": "PASTRANA, HORACIO ABEL", "estado": "Activo"}, {"legajo": "364", "nombre": "YAÑEZ, GUSTAVO RUBEN", "estado": "Activo"}, {"legajo": "369", "nombre": "POZO MARTINEZ, FERNANDO MAURICIO", "estado": "Activo"}, {"legajo": "371", "nombre": "POLAK, EDUARDO OSCAR", "estado": "Activo"}, {"legajo": "373", "nombre": "ALVAREZ, JULIAN ALEJANDRO", "estado": "Activo"}, {"legajo": "379", "nombre": "BOCHATEY, PEDRO ENRIQUE", "estado": "Activo"}, {"legajo": "381", "nombre": "HINOJOSA SEJAS, JUAN CARLOS", "estado": "Activo"}, {"legajo": "382", "nombre": "PURICELLI, DANTE RUBEN", "estado": "Activo"}, {"legajo": "383", "nombre": "CUZEN, ERNESTO OSCAR", "estado": "Activo"}, {"legajo": "392", "nombre": "VIDAL, VICTOR HUGO", "estado": "Activo"}, {"legajo": "396", "nombre": "MARTINS, EDUARDO CESAR", "estado": "Activo"}, {"legajo": "397", "nombre": "YAÑEZ, EDELCIO RUBEN", "estado": "Activo"}, {"legajo": "399", "nombre": "MUÑOZ, LUCIANA MARICEL", "estado": "Activo"}, {"legajo": "410", "nombre": "GAUNA, MARINA", "estado": "Activo"}, {"legajo": "417", "nombre": "BLAZEVIC, CHRISTIAN", "estado": "Activo"}, {"legajo": "435", "nombre": "CUYUL, CRISTIAN FRANCISCO", "estado": "Activo"}, {"legajo": "447", "nombre": "OJEDA, DIEGO ENRIQUE", "estado": "Activo"}, {"legajo": "452", "nombre": "DOMINGUEZ, NESTOR OMAR", "estado": "Activo"}, {"legajo": "453", "nombre": "PARDO, CRISTIAN RICARDO", "estado": "Activo"}, {"legajo": "459", "nombre": "VARGAS, PRIMITIVO", "estado": "Activo"}, {"legajo": "464", "nombre": "CORREA, NESTOR FABIAN", "estado": "Activo"}, {"legajo": "469", "nombre": "LEZCANO, PEDRO FEDERICO", "estado": "Activo"}, {"legajo": "473", "nombre": "RETAMALES, DIANA JESICA", "estado": "Activo"}, {"legajo": "474", "nombre": "BACCI, MARIA LUISA", "estado": "Activo"}, {"legajo": "475", "nombre": "CORREIA, LUCIANA", "estado": "Activo"}, {"legajo": "477", "nombre": "MALIQUEO, JULIAN EDUARDO", "estado": "Activo"}, {"legajo": "478", "nombre": "SALAZAR, CRISTIAN JAVIER", "estado": "Activo"}, {"legajo": "479", "nombre": "ALANIS, WALTER RAMON", "estado": "Activo"}, {"legajo": "489", "nombre": "VEGAS, SANTIAGO JAVIER", "estado": "Activo"}, {"legajo": "492", "nombre": "JONES, ESTEBAN JAVIER", "estado": "Activo"}, {"legajo": "494", "nombre": "PANTANALLI, MARIO FRANCO", "estado": "Activo"}, {"legajo": "500", "nombre": "CAPEROCHIPI, CARLOS LUIS", "estado": "Activo"}, {"legajo": "504", "nombre": "AVILA, RUBEN ADOLFO", "estado": "Activo"}, {"legajo": "508", "nombre": "LLANFULLEN, ROBERTO EZEQUIEL", "estado": "Activo"}, {"legajo": "509", "nombre": "GALLARDO, LEONARDO GERMAN", "estado": "Activo"}, {"legajo": "510", "nombre": "SALDIVIA, RICARDO ANDRES", "estado": "Activo"}, {"legajo": "512", "nombre": "ANDRADA, ELIAS NICOLAS", "estado": "Activo"}, {"legajo": "513", "nombre": "CAYUPEL, MARTIN EDUARDO", "estado": "Activo"}, {"legajo": "515", "nombre": "BLACKIE, MARCELO ENRIQUE", "estado": "Activo"}, {"legajo": "516", "nombre": "RUA, RICARDO DANTE", "estado": "Activo"}, {"legajo": "517", "nombre": "SANDOVAL, DIEGO CESAR", "estado": "Activo"}, {"legajo": "518", "nombre": "SALAZAR, MARIO EZEQUIEL", "estado": "Activo"}, {"legajo": "519", "nombre": "BOCHATEY, MARCOS SEBASTIAN", "estado": "Activo"}, {"legajo": "523", "nombre": "LONCOPAN, FABIAN ALBERTO", "estado": "Activo"}, {"legajo": "526", "nombre": "RIEDEL, EDUARDO DANIEL", "estado": "Activo"}, {"legajo": "529", "nombre": "ARRECHEA, GASTON", "estado": "Activo"}, {"legajo": "530", "nombre": "AGUILAR, RAUL OMAR", "estado": "Activo"}, {"legajo": "532", "nombre": "ACOSTA, FERNANDO DARIO", "estado": "Activo"}, {"legajo": "533", "nombre": "ANTOGNOLI, CRISTHIAN", "estado": "Activo"}, {"legajo": "534", "nombre": "NANCUPILLAN, PAULO SEBASTIAN", "estado": "Activo"}, {"legajo": "538", "nombre": "RUIZ, MAXIMO ARIEL", "estado": "Activo"}, {"legajo": "539", "nombre": "PAEZ, PEDRO RUBEN", "estado": "Activo"}, {"legajo": "544", "nombre": "MUÑOZ, JUAN JOSE", "estado": "Activo"}, {"legajo": "549", "nombre": "FLEITAS, ANTONIO ALEJANDRO", "estado": "Activo"}, {"legajo": "555", "nombre": "HERMOSILLA, ARIEL ERNESTO", "estado": "Activo"}, {"legajo": "558", "nombre": "CATALAN, EDUARDO FABIAN", "estado": "Activo"}, {"legajo": "567", "nombre": "HITA, MARIA LAURA", "estado": "Activo"}, {"legajo": "571", "nombre": "ARANDA, MAURO ALEJANDRO", "estado": "Activo"}, {"legajo": "572", "nombre": "FERRADA, WALTER FERNANDO", "estado": "Activo"}, {"legajo": "573", "nombre": "URIBE, EDGARDO ENRIQUE", "estado": "Activo"}, {"legajo": "576", "nombre": "SCHAMBERGER, CARLOS ALBERTO", "estado": "Activo"}, {"legajo": "578", "nombre": "CATRON, HÉCTOR DANIEL", "estado": "Activo"}, {"legajo": "580", "nombre": "CURILEN, ALDO RUBÉN FAVIÁN", "estado": "Activo"}, {"legajo": "581", "nombre": "DELGADO, GABRIEL DARIO", "estado": "Activo"}, {"legajo": "582", "nombre": "GIMÉNEZ, ENRIQUE DANIEL", "estado": "Activo"}, {"legajo": "583", "nombre": "GAYA, PABLO", "estado": "Activo"}, {"legajo": "586", "nombre": "RIVAS, PABLO ALEJANDRO", "estado": "Activo"}, {"legajo": "588", "nombre": "TOROS, JORGE OMAR", "estado": "Activo"}, {"legajo": "591", "nombre": "AGUILAR, DIEGO OMAR", "estado": "Activo"}, {"legajo": "592", "nombre": "MALDONADO, GABRIEL IVÁN", "estado": "Activo"}, {"legajo": "593", "nombre": "DIAZ, PAULO EMANUEL", "estado": "Activo"}, {"legajo": "595", "nombre": "ARAMBURU, ROBERTO", "estado": "Activo"}, {"legajo": "596", "nombre": "RETAMALES, GUSTAVO SAMUEL", "estado": "Activo"}, {"legajo": "598", "nombre": "NAPAL, LUIS ISMAEL", "estado": "Activo"}, {"legajo": "600", "nombre": "PAINELAF, VICTOR DARIO", "estado": "Activo"}, {"legajo": "602", "nombre": "MANQUICHEO, CARLOS ADRIÁN", "estado": "Activo"}, {"legajo": "603", "nombre": "NAIN, CRISTIAN UBALDO", "estado": "Activo"}, {"legajo": "604", "nombre": "BRAVO, RICARDO JAVIER", "estado": "Activo"}, {"legajo": "606", "nombre": "MELIPICHUN, JOSE MIGUEL", "estado": "Activo"}, {"legajo": "611", "nombre": "CARCAMO, MARCOS ANDRES", "estado": "Activo"}, {"legajo": "612", "nombre": "PALACIOS, LUCIANO RAMÓN", "estado": "Activo"}, {"legajo": "615", "nombre": "GARCIA, DAMIAN ANTONIO", "estado": "Activo"}, {"legajo": "618", "nombre": "MANQUICHEO YAÑEZ, CLAUDIO ANDRES", "estado": "Activo"}, {"legajo": "620", "nombre": "SALAMANCA, PABLO MARTIN", "estado": "Activo"}, {"legajo": "622", "nombre": "GARCIA, GABRIEL EDUARDO", "estado": "Activo"}, {"legajo": "623", "nombre": "DE LUCIA, JUAN PABLO", "estado": "Activo"}, {"legajo": "624", "nombre": "NEUBAUER, RENÉ DAMIAN", "estado": "Activo"}, {"legajo": "625", "nombre": "URETA, LUIS MARCELO", "estado": "Activo"}, {"legajo": "626", "nombre": "IGNACIO, MILTON MAXIMILIANO", "estado": "Activo"}, {"legajo": "628", "nombre": "GALLEGOS, RUBÉN ALBERTO", "estado": "Activo"}, {"legajo": "629", "nombre": "SORIANI, HUMBERTO JOSÉ", "estado": "Activo"}, {"legajo": "630", "nombre": "PAREDES, MARIO DANIEL", "estado": "Activo"}, {"legajo": "632", "nombre": "ACOSTA, JORGE DANIEL", "estado": "Activo"}, {"legajo": "634", "nombre": "MARTINEZ, LUCAS MATIAS", "estado": "Activo"}, {"legajo": "638", "nombre": "LATORRE, GUILLERMO MARCELO", "estado": "Activo"}, {"legajo": "641", "nombre": "MORALES, MARCOS RAFAEL", "estado": "Activo"}, {"legajo": "646", "nombre": "ALANIS, CARLOS DOMINGO", "estado": "Activo"}, {"legajo": "647", "nombre": "ALVARADO, CARLOS HUMBERTO", "estado": "Activo"}, {"legajo": "649", "nombre": "TURRA, JOSE LUIS", "estado": "Activo"}, {"legajo": "651", "nombre": "VILLARINO, FABIO JESUS", "estado": "Activo"}, {"legajo": "653", "nombre": "QUILIÑAN, HUGO ARIEL", "estado": "Activo"}, {"legajo": "655", "nombre": "SANDOVAL, SERGIO RAUL", "estado": "Activo"}, {"legajo": "656", "nombre": "RUIZ DIAZ, RENZO ALBERTO", "estado": "Activo"}, {"legajo": "658", "nombre": "VARGAS, JORGE RAFAEL", "estado": "Activo"}, {"legajo": "662", "nombre": "MUÑOZ, PABLO GASTON", "estado": "Activo"}, {"legajo": "663", "nombre": "MORAGA, ENRIQUE MARTIN", "estado": "Activo"}, {"legajo": "664", "nombre": "MUÑOZ, JUAN NARCISO", "estado": "Activo"}, {"legajo": "665", "nombre": "SALDIVIA, JUAN VICTOR", "estado": "Activo"}, {"legajo": "666", "nombre": "CLEMENTI, MAXIMILIANO", "estado": "Activo"}, {"legajo": "667", "nombre": "ROJAS, CARLOS ALBERTO", "estado": "Activo"}, {"legajo": "668", "nombre": "MONTOYA, RAUL ALEJANDRO", "estado": "Activo"}, {"legajo": "672", "nombre": "CABRAL, CARLOS RAUL", "estado": "Activo"}, {"legajo": "673", "nombre": "CIOTTOLO, MARIO", "estado": "Activo"}, {"legajo": "679", "nombre": "ALVINO, JUAN JOSE", "estado": "Activo"}, {"legajo": "680", "nombre": "VELASQUEZ, JORGE RAMIRO", "estado": "Activo"}, {"legajo": "681", "nombre": "RAMOS, JACINTO ALEJANDRO", "estado": "Activo"}, {"legajo": "684", "nombre": "BRITOS, FRANCISCO DIONISIO", "estado": "Activo"}, {"legajo": "685", "nombre": "NIGRO, MARCOS JOSE", "estado": "Activo"}, {"legajo": "687", "nombre": "HERNANDEZ, DANIEL EDUARDO", "estado": "Activo"}, {"legajo": "692", "nombre": "SANDOVAL, MÓNICA ANDREA", "estado": "Activo"}, {"legajo": "697", "nombre": "PAYNEQUEO, MIGUEL ANGEL", "estado": "Activo"}, {"legajo": "701", "nombre": "CASTILLO SILVA, JOSE CARLOS", "estado": "Activo"}, {"legajo": "704", "nombre": "BONAHORA, SEBASTIAN", "estado": "Activo"}, {"legajo": "705", "nombre": "DIAZ, MARCELO ANDRES", "estado": "Activo"}, {"legajo": "707", "nombre": "GIROTTI, ADRIAN MARCELO", "estado": "Activo"}, {"legajo": "710", "nombre": "TORO, FRANCISCO ALEJANDRO", "estado": "Activo"}, {"legajo": "711", "nombre": "MIRANDA, MARCELO MARTIN", "estado": "Activo"}, {"legajo": "712", "nombre": "CAYUPEL, HUGO ARIEL", "estado": "Activo"}, {"legajo": "715", "nombre": "JARA, GABRIEL", "estado": "Activo"}, {"legajo": "716", "nombre": "VELASQUEZ, JORGE ALEJANDRO", "estado": "Activo"}, {"legajo": "718", "nombre": "SALDIVIA, CARLOS ANDRES", "estado": "Activo"}, {"legajo": "720", "nombre": "VELAZQUEZ, MARCOS JAVIER", "estado": "Activo"}, {"legajo": "721", "nombre": "GONZALEZ, NEREO BALTAZAR", "estado": "Activo"}, {"legajo": "724", "nombre": "AGUIRRE, SEBASTIAN EMANUEL", "estado": "Activo"}, {"legajo": "726", "nombre": "MARTINEZ, MATIAS SEBASTIAN", "estado": "Activo"}, {"legajo": "728", "nombre": "CASAS, CARLOS ALBERTO DIEGO", "estado": "Activo"}, {"legajo": "730", "nombre": "JARA HERNANDEZ, JUAN CARLOS", "estado": "Activo"}, {"legajo": "732", "nombre": "HERNANDEZ, RICARDO", "estado": "Activo"}, {"legajo": "734", "nombre": "CURRUMAN, HORACIO DANIEL", "estado": "Activo"}, {"legajo": "735", "nombre": "SALAZAR, ALEJANDRO DAMIAN", "estado": "Activo"}, {"legajo": "736", "nombre": "PAINELAF, CRISTIAN ANDRES", "estado": "Activo"}, {"legajo": "737", "nombre": "SALDIVIA, JAVIER ANDRES", "estado": "Activo"}, {"legajo": "744", "nombre": "EGEA, FERNANDO OMAR", "estado": "Activo"}, {"legajo": "745", "nombre": "CASTELLANI, MARTIN EMILIANO", "estado": "Activo"}, {"legajo": "746", "nombre": "ROMERO, CESAR LUIS", "estado": "Activo"}, {"legajo": "751", "nombre": "LORENZO, DIANA MABEL", "estado": "Activo"}, {"legajo": "753", "nombre": "ROBERTS, JAVIER IVAN", "estado": "Activo"}, {"legajo": "754", "nombre": "VERGARA, DANIEL ARMANDO", "estado": "Activo"}, {"legajo": "755", "nombre": "NIETHAMMER, GUSTAVO GERMAN", "estado": "Activo"}, {"legajo": "756", "nombre": "LEBLIC, ALFREDO RAUL", "estado": "Activo"}, {"legajo": "759", "nombre": "CATTO, MAURO SEBASTIAN", "estado": "Activo"}, {"legajo": "761", "nombre": "FERREYRA, MARISA ROXANA", "estado": "Activo"}, {"legajo": "763", "nombre": "MEDINA, CARLOS NEMESIO", "estado": "Activo"}, {"legajo": "765", "nombre": "GALLARDO, JUAN CARLOS", "estado": "Activo"}, {"legajo": "767", "nombre": "APARICIO, ANTONIO GUSTAVO", "estado": "Activo"}, {"legajo": "768", "nombre": "MANSILLA VELASQUEZ, MARIO ANDRES", "estado": "Activo"}, {"legajo": "769", "nombre": "MARTINEZ, NELSON GUSTAVO", "estado": "Activo"}, {"legajo": "770", "nombre": "ROBLEDO, FABIAN ALBERTO", "estado": "Activo"}, {"legajo": "773", "nombre": "FIGUEROA, NESTOR ALEJANDRO", "estado": "Activo"}, {"legajo": "774", "nombre": "CORREA, DUILIO RAUL", "estado": "Activo"}, {"legajo": "775", "nombre": "LARRAURI, CRISTIAN MIGUEL", "estado": "Activo"}, {"legajo": "776", "nombre": "VILLAMAYOR, OSCAR ALBERTO", "estado": "Activo"}, {"legajo": "777", "nombre": "QUEVEDO, ADRIAN JAVIER", "estado": "Activo"}, {"legajo": "779", "nombre": "TORA, CHRISTIAN ALEXIS", "estado": "Activo"}, {"legajo": "781", "nombre": "ALANIS, SEBASTIAN DANIEL", "estado": "Activo"}, {"legajo": "782", "nombre": "SOLIS, ANIBAL", "estado": "Activo"}, {"legajo": "783", "nombre": "HIDALGO, DANIEL ALEJANDRO", "estado": "Activo"}, {"legajo": "784", "nombre": "GONZALEZ, JUAN CARLOS", "estado": "Activo"}, {"legajo": "786", "nombre": "NAVEDA, FABIO VALENTIN", "estado": "Activo"}, {"legajo": "787", "nombre": "SALDIVIA CALDERON, OSCAR DANIEL", "estado": "Activo"}, {"legajo": "789", "nombre": "SAEZ, FRANCO OSCAR", "estado": "Activo"}, {"legajo": "790", "nombre": "QUIROGA, NESTOR FABIAN", "estado": "Activo"}, {"legajo": "791", "nombre": "THOMAS, CLAUDIO ALBERTO", "estado": "Activo"}, {"legajo": "793", "nombre": "SILVA, EDUARDO SALVADOR", "estado": "Activo"}, {"legajo": "795", "nombre": "ROMERO, DIEGO MAURICIO", "estado": "Activo"}, {"legajo": "796", "nombre": "SANCHEZ, ENRIQUE OMAR", "estado": "Activo"}, {"legajo": "798", "nombre": "GARCIA, RICARDO OCTAVIO", "estado": "Activo"}, {"legajo": "801", "nombre": "GONZALEZ, JONATAN ALEXIS", "estado": "Activo"}, {"legajo": "803", "nombre": "AGUILAR, HECTOR FABIAN", "estado": "Activo"}, {"legajo": "805", "nombre": "SALDIVIA, GUSTAVO GABRIEL", "estado": "Activo"}, {"legajo": "807", "nombre": "GELVEZ, ALEXIS SEBASTIAN", "estado": "Activo"}, {"legajo": "808", "nombre": "SOSA, MARIELA FERNANDA", "estado": "Activo"}, {"legajo": "811", "nombre": "HUMEREZ, EDUARDO", "estado": "Activo"}, {"legajo": "813", "nombre": "RAMIREZ, GABRIEL EDGARDO", "estado": "Activo"}, {"legajo": "814", "nombre": "ARANEDA, FERNANDO ARIEL", "estado": "Activo"}, {"legajo": "816", "nombre": "RIVAS, HECTOR ALEJANDRO", "estado": "Activo"}, {"legajo": "817", "nombre": "MORENO, EVELIN SOLEDAD", "estado": "Activo"}, {"legajo": "818", "nombre": "OTIÑANO, JUAN JOSE", "estado": "Activo"}, {"legajo": "821", "nombre": "MARTINEZ, EZEQUIEL ALEJANDRO", "estado": "Activo"}, {"legajo": "824", "nombre": "NIETHAMMER, RICARDO ANDRES", "estado": "Activo"}, {"legajo": "825", "nombre": "ARIAS, PABLO CESAR", "estado": "Activo"}, {"legajo": "827", "nombre": "RAIMAPO, GUSTAVO DAVID", "estado": "Activo"}, {"legajo": "828", "nombre": "DE LA LLAMA, NORBERTO ARGENTINO", "estado": "Activo"}, {"legajo": "830", "nombre": "LARRAURI, JOSE ALFREDO", "estado": "Activo"}, {"legajo": "833", "nombre": "CORZO, JAVIER ORLANDO", "estado": "Activo"}, {"legajo": "834", "nombre": "VACHETTA, LUIS DANIEL", "estado": "Activo"}, {"legajo": "835", "nombre": "COBOS, MARIA JULIETA", "estado": "Activo"}, {"legajo": "836", "nombre": "AGUILAR, EZEQUIEL ALEJANDRO", "estado": "Activo"}, {"legajo": "838", "nombre": "FERNANDEZ, NESTOR EDUARDO", "estado": "Activo"}, {"legajo": "840", "nombre": "QUINTAS, GUILLERMO GUSTAVO", "estado": "Activo"}, {"legajo": "844", "nombre": "MADEIRA, HELDER ADRIAN", "estado": "Activo"}, {"legajo": "852", "nombre": "AGÜERO ARCE, NORBERTO JESUS DARIO", "estado": "Activo"}, {"legajo": "858", "nombre": "CORREA, FABIAN EDGARDO", "estado": "Activo"}, {"legajo": "863", "nombre": "CANCINO, CARLOS SEGUNDO", "estado": "Activo"}, {"legajo": "864", "nombre": "NADUAN, MARCOS DANIEL", "estado": "Activo"}, {"legajo": "867", "nombre": "LEON, RUBEN OSCAR", "estado": "Activo"}, {"legajo": "868", "nombre": "VILLARREAL, JAVIER CECILIO", "estado": "Activo"}, {"legajo": "871", "nombre": "MORENO, JUAN CARLOS", "estado": "Activo"}, {"legajo": "872", "nombre": "GUERRERO, ELIAS RAUL", "estado": "Activo"}, {"legajo": "873", "nombre": "FRIAS, GERARDO ANDRES", "estado": "Activo"}, {"legajo": "875", "nombre": "ESTEVEZ, LEONARDO EZEQUIEL", "estado": "Activo"}, {"legajo": "876", "nombre": "CASTRO, MIGUEL ANGEL", "estado": "Activo"}, {"legajo": "877", "nombre": "PEREZ, JUAN MANUEL", "estado": "Activo"}, {"legajo": "878", "nombre": "AGUILAR, PABLO CESAR", "estado": "Activo"}, {"legajo": "879", "nombre": "VASQUE, MARIANO BENIGNO", "estado": "Activo"}, {"legajo": "881", "nombre": "BERATZ, GABRIELA BEATRIZ", "estado": "Activo"}, {"legajo": "882", "nombre": "GONZALEZ, SERGIO SEBASTIAN", "estado": "Activo"}, {"legajo": "883", "nombre": "PAYNEQUEO, EMMANUEL FERNANDO", "estado": "Activo"}, {"legajo": "884", "nombre": "GUERREIRO, MAURO MATIAS", "estado": "Activo"}, {"legajo": "886", "nombre": "MORALES, RICARDO ELBIO", "estado": "Activo"}, {"legajo": "887", "nombre": "MAÑAO, ROBINSON EDUARDO", "estado": "Activo"}, {"legajo": "889", "nombre": "CHARETTE, ENZO LUCAS", "estado": "Activo"}, {"legajo": "891", "nombre": "SALAMANCA, HECTOR OMAR", "estado": "Activo"}, {"legajo": "893", "nombre": "CREGO, CARLOS ANDRES", "estado": "Activo"}, {"legajo": "894", "nombre": "CUZEN, CRISTIAN FERNANDO", "estado": "Activo"}, {"legajo": "899", "nombre": "CAAMAÑO, DARIO SEBASTIAN", "estado": "Activo"}, {"legajo": "900", "nombre": "OYARZO, JONATHAN ISAAC", "estado": "Activo"}, {"legajo": "903", "nombre": "REARTES, DANIEL MARCELO", "estado": "Activo"}, {"legajo": "904", "nombre": "VELASQUEZ, LUCAS ANTONIO", "estado": "Activo"}, {"legajo": "909", "nombre": "ALVARADO, LEANDRO SEBASTIAN", "estado": "Activo"}, {"legajo": "912", "nombre": "TREVISAN, MARIANELLA", "estado": "Activo"}, {"legajo": "917", "nombre": "CAMPOS, JUAN ALFREDO", "estado": "Activo"}, {"legajo": "918", "nombre": "SANDOVAL, FRANCO EZEQUIEL", "estado": "Activo"}, {"legajo": "919", "nombre": "AYBAR, IVAN FRANCISCO", "estado": "Activo"}, {"legajo": "920", "nombre": "THOMAS, CRISTIAN HORACIO", "estado": "Activo"}, {"legajo": "921", "nombre": "SOSA, LUCAS DAMIAN", "estado": "Activo"}, {"legajo": "922", "nombre": "TORRES, JORGE DANIEL", "estado": "Activo"}, {"legajo": "923", "nombre": "LEVICOY, MARIO DAVID", "estado": "Activo"}, {"legajo": "924", "nombre": "QUINTANA, BRENDA NATALIA", "estado": "Activo"}, {"legajo": "925", "nombre": "MILLAPE, RUBEN CARLOS", "estado": "Activo"}, {"legajo": "926", "nombre": "JAQUE, JOSE FERNANDO", "estado": "Activo"}, {"legajo": "927", "nombre": "PEREZ TREVISAN, ISABEL CRISTINA", "estado": "Activo"}, {"legajo": "928", "nombre": "VARGAS, PABLO DANIEL", "estado": "Activo"}, {"legajo": "929", "nombre": "HENNY, RAUL ALEJANDRO", "estado": "Activo"}, {"legajo": "930", "nombre": "MENICHETTI, DANTE MIGUEL", "estado": "Activo"}, {"legajo": "931", "nombre": "CABRERA, FRANCISCO NICOLAS", "estado": "Activo"}, {"legajo": "932", "nombre": "CALLBUYAHUE, JOSE MIGUEL", "estado": "Activo"}, {"legajo": "933", "nombre": "MACHAIN, MARIA CECILIA", "estado": "Activo"}, {"legajo": "934", "nombre": "MARQUEZ, ROBERTO LUIS", "estado": "Activo"}, {"legajo": "935", "nombre": "GUTIERREZ, GABRIEL ARNALDO", "estado": "Activo"}, {"legajo": "936", "nombre": "BURGOS, TAMARA ELIZABETH", "estado": "Activo"}, {"legajo": "939", "nombre": "VERA, VICTOR HUGO", "estado": "Activo"}, {"legajo": "940", "nombre": "MORALES, ADRIAN GABRIEL", "estado": "Activo"}, {"legajo": "943", "nombre": "GALLEGOS, DANIEL ALBANO", "estado": "Activo"}, {"legajo": "946", "nombre": "ROMERO, JULIO EZEQUIEL", "estado": "Activo"}, {"legajo": "947", "nombre": "NICKELS, FERNANDO ANDRES", "estado": "Activo"}, {"legajo": "948", "nombre": "BARRIENTOS, VICTOR DANIEL", "estado": "Activo"}, {"legajo": "949", "nombre": "CABRAL, CLAUDIO", "estado": "Activo"}, {"legajo": "950", "nombre": "BECERRA, CLAUDIO EZEQUIEL", "estado": "Activo"}, {"legajo": "951", "nombre": "MONCHEBEUF, RICARDO ARIEL", "estado": "Activo"}, {"legajo": "954", "nombre": "SANCA, MIRNA DANIELA", "estado": "Activo"}, {"legajo": "957", "nombre": "ARMOYA, MATIAS JOSE LUIS", "estado": "Activo"}, {"legajo": "958", "nombre": "THOMAS, LUCAS JAMES", "estado": "Activo"}, {"legajo": "959", "nombre": "PEREZ, FRANCISCO JOSE", "estado": "Activo"}, {"legajo": "960", "nombre": "RUIZ, GASTON ALEX", "estado": "Activo"}, {"legajo": "963", "nombre": "OYARZO, ARIEL EDUARDO", "estado": "Activo"}, {"legajo": "965", "nombre": "AGUILAR, DARIO ORLANDO", "estado": "Activo"}, {"legajo": "966", "nombre": "JARAMILLO, CRISTIAN EMMANUEL", "estado": "Activo"}, {"legajo": "967", "nombre": "RAIMAPO, LUCAS GASTON", "estado": "Activo"}, {"legajo": "969", "nombre": "SALGAO, BRIAN EDUARDO", "estado": "Activo"}, {"legajo": "971", "nombre": "SCHULER, MIGUEL WALDO", "estado": "Activo"}, {"legajo": "972", "nombre": "MASCIO MENDOZA, SERGIO ESTEBAN", "estado": "Activo"}, {"legajo": "973", "nombre": "COTIDIANO, MARCELO ALEJANDRO", "estado": "Activo"}, {"legajo": "975", "nombre": "BELLIDO, FRANCO MATIAS", "estado": "Activo"}, {"legajo": "977", "nombre": "LINARES, CARLOS GUILLERMO", "estado": "Activo"}, {"legajo": "978", "nombre": "CURRUMAN MORGAN, KEVIN ALEXANDER", "estado": "Activo"}, {"legajo": "981", "nombre": "MAURER, ERNESTO GUILLERMO", "estado": "Activo"}, {"legajo": "983", "nombre": "OGAS, CAROLINA SOLEDAD", "estado": "Activo"}, {"legajo": "984", "nombre": "YAPURA, LUCAS ELIO EMANUEL", "estado": "Activo"}, {"legajo": "985", "nombre": "MOLINA, RICHARD ALEXANDER", "estado": "Activo"}, {"legajo": "987", "nombre": "LOPEZ, ROMINA GISEL", "estado": "Activo"}, {"legajo": "988", "nombre": "VALENZUELA, FERNANDO JAVIER", "estado": "Activo"}, {"legajo": "989", "nombre": "QUIÑELAF, HUGO VICTOR", "estado": "Activo"}, {"legajo": "990", "nombre": "LORENZO, DENIS ARIEL", "estado": "Activo"}, {"legajo": "991", "nombre": "OBREQUE, GISEL", "estado": "Activo"}, {"legajo": "993", "nombre": "SALDIVIA, MAXIMILIANO ANDRES", "estado": "Activo"}, {"legajo": "994", "nombre": "BECERRA, CARLOS ANTONIO", "estado": "Activo"}, {"legajo": "995", "nombre": "FERNANDEZ, CLAUDIO ANTONIO", "estado": "Activo"}, {"legajo": "997", "nombre": "SANCHEZ, DANIEL ALEJANDRO", "estado": "Activo"}, {"legajo": "998", "nombre": "VILLEGAS GUARDO, KARIM JOSUE", "estado": "Activo"}, {"legajo": "999", "nombre": "BECERRA, ALEXANDER NAHUEL", "estado": "Activo"}, {"legajo": "1010", "nombre": "CAYUPEL, GUSTAVO DAVID", "estado": "Activo"}, {"legajo": "1011", "nombre": "THOMAS, ARIEL FERNANDO", "estado": "Activo"}, {"legajo": "1025", "nombre": "TIMI, GUSTAVO DANIEL", "estado": "Activo"}, {"legajo": "1044", "nombre": "MELIN, JONATAN", "estado": "Activo"}, {"legajo": "1078", "nombre": "MANSILLA, MARISA DEL CARMEN", "estado": "Activo"}, {"legajo": "1103", "nombre": "LASBIAS, LISANDRO MARTIN", "estado": "Activo"}, {"legajo": "1147", "nombre": "TORRES, MARIA ALEJANDRA", "estado": "Activo"}, {"legajo": "1152", "nombre": "UGRINA, JOSE ALEJANDRO", "estado": "Activo"}, {"legajo": "1153", "nombre": "ROMERO, HERNAN XAVIER", "estado": "Activo"}, {"legajo": "1164", "nombre": "KRUGER, DIEGO EZEQUIEL", "estado": "Activo"}, {"legajo": "1167", "nombre": "BEYNON, ALBERTO MAURICIO", "estado": "Activo"}, {"legajo": "1186", "nombre": "BURGOS, MIRTA GABRIELA", "estado": "Activo"}, {"legajo": "1188", "nombre": "MUÑOZ, SARA IRENE", "estado": "Activo"}, {"legajo": "1190", "nombre": "CARDENAS, FERNANDO ISAIAS", "estado": "Activo"}, {"legajo": "1191", "nombre": "CARRASCO, BAUTISTA JAVIER", "estado": "Activo"}, {"legajo": "1195", "nombre": "SILVA, EDITA DEL CARMEN", "estado": "Activo"}, {"legajo": "1197", "nombre": "ROJAS, RAUL RICARDO", "estado": "Activo"}, {"legajo": "1200", "nombre": "BURGOS, JULIAN ALBERTO", "estado": "Activo"}, {"legajo": "1202", "nombre": "DIAZ RAMIREZ, DALIA MARGOT", "estado": "Activo"}, {"legajo": "1204", "nombre": "SANDRINI, VANESA ALEJANDRA", "estado": "Activo"}, {"legajo": "1205", "nombre": "LLANFULLEN, BRUNO SEBASTIAN", "estado": "Activo"}, {"legajo": "1211", "nombre": "SARQUIS, FRANCO DAVID", "estado": "Activo"}, {"legajo": "1213", "nombre": "SCHMEISSER, NICOLAS", "estado": "Activo"}, {"legajo": "1214", "nombre": "JARA, MIRTA MABEL", "estado": "Activo"}, {"legajo": "1219", "nombre": "QUIÑELAF, SERGIO DANIEL", "estado": "Activo"}, {"legajo": "1221", "nombre": "PINCHEIRA, ROBERTO CARLOS", "estado": "Activo"}, {"legajo": "1222", "nombre": "JARA, RICARDO ALBERTO", "estado": "Activo"}, {"legajo": "1225", "nombre": "PRIETO, TANIA MARIANELA", "estado": "Activo"}, {"legajo": "1227", "nombre": "INSUA, ROBERTO MARTIN", "estado": "Activo"}, {"legajo": "1229", "nombre": "GOMEZ, RUBEN EDUARDO", "estado": "Activo"}, {"legajo": "1230", "nombre": "COÑOCAR, DANIEL EZEQUIEL", "estado": "Activo"}, {"legajo": "1233", "nombre": "CIFUENTES, RAMIRO RICARDO OSCAR", "estado": "Activo"}, {"legajo": "1234", "nombre": "GONZALEZ, MACARENA GISEL", "estado": "Activo"}, {"legajo": "1235", "nombre": "SALTO, FABIAN MARCELO", "estado": "Activo"}, {"legajo": "1240", "nombre": "YAÑEZ, OSCAR EDUARDO", "estado": "Activo"}, {"legajo": "1241", "nombre": "MARDONES, JAVIER ALBERTO", "estado": "Activo"}, {"legajo": "1242", "nombre": "QUIÑELAF, HUGO MANUEL", "estado": "Activo"}, {"legajo": "1247", "nombre": "FIGUEROA, JAVIER ESTEBAN", "estado": "Activo"}, {"legajo": "1248", "nombre": "DIAS, LORENA FERNANDA", "estado": "Activo"}, {"legajo": "1250", "nombre": "SANTANA, HERNAN NICOLAS", "estado": "Activo"}, {"legajo": "1255", "nombre": "ALVAREZ, EMANUEL ALEJANDRO", "estado": "Activo"}, {"legajo": "1257", "nombre": "BEYNON, NICOLAS IRENEO", "estado": "Activo"}, {"legajo": "1258", "nombre": "BURGOS, FACUNDO EZEQUIEL", "estado": "Activo"}, {"legajo": "1259", "nombre": "ROMERO, KAREN MARLEN", "estado": "Activo"}, {"legajo": "1260", "nombre": "DI CIANNI, MATIAS LUCIANO", "estado": "Activo"}, {"legajo": "1262", "nombre": "TRIUNFO, WALTER JAVIER", "estado": "Activo"}, {"legajo": "1263", "nombre": "ZIADEH, JONATHAN ALFREDO", "estado": "Activo"}, {"legajo": "1266", "nombre": "CHAVEZ, CARLOS ARIEL", "estado": "Activo"}, {"legajo": "1267", "nombre": "PINEDA, LUCAS MARTIN", "estado": "Activo"}, {"legajo": "1268", "nombre": "CASTRO, DANIEL FEDERICO", "estado": "Activo"}, {"legajo": "1269", "nombre": "LLANQUIN, JOSE CAYETANO", "estado": "Activo"}, {"legajo": "1271", "nombre": "DEIPENAU, RICARDO TOMAS", "estado": "Activo"}, {"legajo": "1272", "nombre": "REDEL DICKASON, FRANCO DANIEL", "estado": "Activo"}, {"legajo": "1273", "nombre": "SANDRINI, HUGO GABRIEL", "estado": "Activo"}, {"legajo": "1274", "nombre": "ZIADEH, ALEXIS FERNANDO", "estado": "Activo"}, {"legajo": "1275", "nombre": "SALAZAR, GASTON EDUARDO", "estado": "Activo"}, {"legajo": "1276", "nombre": "QUIÑELAF, GONZALO GABRIEL", "estado": "Activo"}, {"legajo": "1277", "nombre": "OTIÑANO, ORIANA VALENTINA", "estado": "Activo"}, {"legajo": "1278", "nombre": "PEREZ, VALENTINA", "estado": "Activo"}, {"legajo": "1279", "nombre": "VIDAL, AGUSTIN RODRIGO", "estado": "Activo"}, {"legajo": "1280", "nombre": "QUIJANO, GASTON ENRIQUE", "estado": "Activo"}, {"legajo": "1281", "nombre": "QUIDULEF, ISEL MATIAS", "estado": "Activo"}, {"legajo": "1283", "nombre": "SUBIABRE, PABLO MARTIN", "estado": "Activo"}, {"legajo": "1287", "nombre": "BARRIENTOS, CRISTIAN DANIEL", "estado": "Activo"}, {"legajo": "1288", "nombre": "CABRAL, LUCAS NICOLAS", "estado": "Activo"}, {"legajo": "1289", "nombre": "TENORIO ROJAS, CRISTIAN BORIS", "estado": "Activo"}, {"legajo": "1290", "nombre": "AYBAR, LUCAS TOMAS", "estado": "Activo"}, {"legajo": "1291", "nombre": "SECO, FACUNDO FEDERICO", "estado": "Activo"}, {"legajo": "1293", "nombre": "COMTE, ALBERTO", "estado": "Activo"}, {"legajo": "1295", "nombre": "AGUIRRE, JEREMIAS JULIAN", "estado": "Activo"}, {"legajo": "1298", "nombre": "QUIDULEF, LEONARDO SEBASTIAN", "estado": "Activo"}, {"legajo": "1300", "nombre": "BURGOS, PEDRO OSCAR", "estado": "Activo"}, {"legajo": "1301", "nombre": "ESCALANTE, FRANCO ESEQUIEL", "estado": "Activo"}, {"legajo": "1302", "nombre": "SALAMANCA, DIEGO ABEL", "estado": "Activo"}, {"legajo": "1303", "nombre": "CHAMORRO, LUIS EMILIO", "estado": "Activo"}, {"legajo": "1304", "nombre": "CAMPOBASSO, LAURA", "estado": "Activo"}, {"legajo": "1305", "nombre": "CAYUPEL, LUCAS RODRIGO", "estado": "Activo"}, {"legajo": "1306", "nombre": "LLANQUIN, GABRIEL LAUTARO", "estado": "Activo"}, {"legajo": "1307", "nombre": "RULLIER, FEDERICO", "estado": "Activo"}, {"legajo": "1308", "nombre": "BERTONA, VICTOR ANDRES", "estado": "Activo"}, {"legajo": "1309", "nombre": "MACIEL ENCINAS, HUGO LA CRUZ", "estado": "Activo"}, {"legajo": "1311", "nombre": "ABARZUA VILLARINO, FACUNDO LUIS", "estado": "Activo"}, {"legajo": "1313", "nombre": "MARQUEZ, LUCAS JESUS", "estado": "Activo"}, {"legajo": "1314", "nombre": "CARCAMO, GASTON ALEJANDRO", "estado": "Activo"}, {"legajo": "1315", "nombre": "NICOLAS, SANDRO DANIEL", "estado": "Activo"}, {"legajo": "1316", "nombre": "ESPAT, ALEXIS EDGARDO", "estado": "Activo"}, {"legajo": "1319", "nombre": "LUCERO, PABLO EZEQUIEL", "estado": "Activo"}, {"legajo": "1320", "nombre": "AINOL, DIEGO SEBASTIAN", "estado": "Activo"}, {"legajo": "1321", "nombre": "BARRERA, EZEQUIEL AGUSTIN", "estado": "Activo"}, {"legajo": "1322", "nombre": "GALLARDO, MATIAS EZEQUIEL", "estado": "Activo"}, {"legajo": "1323", "nombre": "TIZNADO, RONI LEANDRO", "estado": "Activo"}, {"legajo": "1325", "nombre": "GALLARDO, BASTIAN RODRIGO", "estado": "Activo"}, {"legajo": "1326", "nombre": "DONNET, MAXIMILIANO", "estado": "Activo"}, {"legajo": "1327", "nombre": "RENE, NAHUEL HERNAN", "estado": "Activo"}, {"legajo": "1328", "nombre": "PEREZ, ISRAEL EZEQUIEL", "estado": "Activo"}, {"legajo": "1330", "nombre": "QUEZADA, CESAR DAMIAN", "estado": "Activo"}, {"legajo": "1331", "nombre": "SEPULVEDA, CAMILA BELEN", "estado": "Activo"}, {"legajo": "1332", "nombre": "PEREZ, JUAN JOSE", "estado": "Activo"}, {"legajo": "1333", "nombre": "CONTRERAS, LUCAS GABRIEL", "estado": "Activo"}, {"legajo": "1334", "nombre": "DIAZ, ELIO ABEL", "estado": "Activo"}, {"legajo": "1335", "nombre": "BENITEZ, JORGE ANTONIO", "estado": "Activo"}, {"legajo": "1337", "nombre": "GARCIA, RAMIRO", "estado": "Activo"}, {"legajo": "1338", "nombre": "VELAZQUEZ, ELIAS AGUSTIN", "estado": "Activo"}, {"legajo": "1339", "nombre": "ORTEGA, JULIO ALBERTO", "estado": "Activo"}, {"legajo": "1340", "nombre": "SALGAO, LEANDRO EMMANUEL", "estado": "Activo"}, {"legajo": "1341", "nombre": "DESPO, BRIAN EZEQUIEL", "estado": "Activo"}, {"legajo": "1342", "nombre": "DOMINGUEZ, EDGARDO JAVIER", "estado": "Activo"}, {"legajo": "1343", "nombre": "SORIANI, JOSE AGUSTIN", "estado": "Activo"}, {"legajo": "1344", "nombre": "SILVA, CESAR DOMINGO", "estado": "Activo"}, {"legajo": "1345", "nombre": "SALAMANCA, LUCAS RODRIGO", "estado": "Activo"}, {"legajo": "1347", "nombre": "GONZALEZ, ANDRES EMILIO", "estado": "Activo"}, {"legajo": "1348", "nombre": "CARCAMO, PABLO ARIEL", "estado": "Activo"}, {"legajo": "1350", "nombre": "COMTE, FRANCIS", "estado": "Activo"}, {"legajo": "1351", "nombre": "MORENO, MATIAS JULIAN", "estado": "Activo"}, {"legajo": "1352", "nombre": "RAMIREZ, LUCAS GABRIEL", "estado": "Activo"}, {"legajo": "1353", "nombre": "IGNACIO, LAUTARO EZEQUIEL", "estado": "Activo"}, {"legajo": "1354", "nombre": "VEGAS, SANTIAGO JAVIER", "estado": "Activo"}, {"legajo": "1356", "nombre": "GONZALEZ, EZEQUIEL LUCAS", "estado": "Activo"}, {"legajo": "1357", "nombre": "CABRAL, FRANCO ALEJANDRO", "estado": "Activo"}, {"legajo": "1358", "nombre": "JARA, GASTON AGUSTIN", "estado": "Activo"}, {"legajo": "1359", "nombre": "MADRID, ALEXIS EDUARDO", "estado": "Activo"}, {"legajo": "1360", "nombre": "CREGO, DIEGO SEBASTIAN", "estado": "Activo"}, {"legajo": "1362", "nombre": "CARDENAS, CRISTIAN ARIEL", "estado": "Activo"}, {"legajo": "1364", "nombre": "SALDIVIA, DAIANA LOURDES", "estado": "Activo"}, {"legajo": "1365", "nombre": "MONCHEBEUF, ADRIAN GONZALO", "estado": "Activo"}, {"legajo": "1366", "nombre": "OYARZUN, TOMAS EZEQUIEL", "estado": "Activo"}, {"legajo": "1367", "nombre": "GALLEGOS, LEONARDO RUBEN", "estado": "Activo"}, {"legajo": "1368", "nombre": "RUIZ, LAUTARO ALBERTO", "estado": "Activo"}, {"legajo": "1369", "nombre": "MARQUEZ, FACUNDO EMANUEL", "estado": "Activo"}, {"legajo": "1370", "nombre": "ROMERO, EDUARDO AGUSTIN", "estado": "Activo"}, {"legajo": "1371", "nombre": "MILLAPE, PEDRO ALEJANDRO", "estado": "Activo"}, {"legajo": "1372", "nombre": "AGUILAR, NICOLAS DARIO", "estado": "Activo"}, {"legajo": "1374", "nombre": "ULLOA, JAVIER EDUARDO", "estado": "Activo"}, {"legajo": "1375", "nombre": "MONGE, ARIEL", "estado": "Activo"}, {"legajo": "1376", "nombre": "THOMAS, JAVIER ANDRES", "estado": "Activo"}, {"legajo": "1378", "nombre": "SEGURADO CARRIZO, JUAN JOSE", "estado": "Activo"}, {"legajo": "1379", "nombre": "PONS, VALERIA LORENA", "estado": "Activo"}, {"legajo": "1380", "nombre": "VARAS, LUIS ERNESTO", "estado": "Activo"}, {"legajo": "1381", "nombre": "BLANCO, JONATAN DAVID", "estado": "Activo"}, {"legajo": "1382", "nombre": "GARCIA, JUAN GABRIEL", "estado": "Activo"}, {"legajo": "1383", "nombre": "ORIHUELA, VICTOR DANIEL", "estado": "Activo"}, {"legajo": "1384", "nombre": "MANQUIMILLA, ERNESTO EDUARDO", "estado": "Activo"}, {"legajo": "1385", "nombre": "ORIHUELA, MATIAS", "estado": "Activo"}, {"legajo": "1386", "nombre": "MELLADO, JORGE MAURICIO", "estado": "Activo"}, {"legajo": "1387", "nombre": "MALIQUEO, MATIAS ANDRES", "estado": "Activo"}, {"legajo": "1388", "nombre": "ARRATIA, JULIAN ALBERTO", "estado": "Activo"}, {"legajo": "1389", "nombre": "CARPENA, ANDRES RODOLFO", "estado": "Activo"}, {"legajo": "1390", "nombre": "VINAGRE, CAROLINA", "estado": "Activo"}, {"legajo": "1391", "nombre": "MENDOZA, LAUTARO ARIEL", "estado": "Activo"}, {"legajo": "1392", "nombre": "CONTRERAS, THIAGO ESTEBAN", "estado": "Activo"}, {"legajo": "1393", "nombre": "ANTONIO, ALEJANDRO GABRIEL", "estado": "Activo"}, {"legajo": "1394", "nombre": "BELGE, BENJAMIN NOLBERTO", "estado": "Activo"}, {"legajo": "1395", "nombre": "CAYUN, LEANDRO JAVIER", "estado": "Activo"}, {"legajo": "1396", "nombre": "CURIÑANCO, DANIEL ALBERTO", "estado": "Activo"}, {"legajo": "1397", "nombre": "DIAZ, MATIAS IVAN", "estado": "Activo"}, {"legajo": "1398", "nombre": "FULLANA, JUAN DAMIAN", "estado": "Activo"}, {"legajo": "1399", "nombre": "GODOY, JORGE MARTIN", "estado": "Activo"}, {"legajo": "1400", "nombre": "GODOY, OSCAR ALEJANDRO", "estado": "Activo"}, {"legajo": "1401", "nombre": "HOURCADE, MATIAS EZEQUIEL", "estado": "Activo"}, {"legajo": "1402", "nombre": "HUENCHILLAN, GUSTAVO ALEJANDRO", "estado": "Activo"}, {"legajo": "1403", "nombre": "HUILLIPAN, ROLANDO ARIEL", "estado": "Activo"}, {"legajo": "1404", "nombre": "LUQUE, OSCAR ALBERTO", "estado": "Activo"}, {"legajo": "1405", "nombre": "NIETO, GUILLERMO ANDRES", "estado": "Activo"}, {"legajo": "1406", "nombre": "RASJIDO, MIGUEL ANGEL", "estado": "Activo"}, {"legajo": "1407", "nombre": "RUA, JORGE EMILIO", "estado": "Activo"}, {"legajo": "1408", "nombre": "SERRANO, CONRADO GABRIEL", "estado": "Activo"}, {"legajo": "1409", "nombre": "TEIGUEL, MARCOS NICOLAS", "estado": "Activo"}, {"legajo": "1410", "nombre": "URRUTIA, ADRIAN GASTON", "estado": "Activo"}, {"legajo": "1411", "nombre": "VARGAS, GUILLERMO RAUL", "estado": "Activo"}, {"legajo": "1412", "nombre": "VARGAS, NELSON MARTIN", "estado": "Activo"}, {"legajo": "1413", "nombre": "VIVAR, RICARDO DANIEL", "estado": "Activo"}, {"legajo": "1414", "nombre": "VEGA, CARLOS ENRIQUE", "estado": "Activo"}, {"legajo": "1415", "nombre": "ZAPATA, CARLOS LUIS", "estado": "Activo"}, {"legajo": "1416", "nombre": "NAHUEL, HECTOR SAMUEL", "estado": "Activo"}, {"legajo": "1417", "nombre": "ALVAREZ, JUAN DAVID", "estado": "Activo"}, {"legajo": "1418", "nombre": "CARDENAS, DEBORA ANALIA", "estado": "Activo"}, {"legajo": "1419", "nombre": "REARTES, ENZO DAMIAN", "estado": "Activo"}, {"legajo": "2009", "nombre": "CAAMAÑO, HECTOR OSCAR", "estado": "Activo"}, {"legajo": "2043", "nombre": "SOSA, ORLANDO DARIO", "estado": "Activo"}, {"legajo": "2046", "nombre": "HERNANDEZ, RICHARD DAMIAN", "estado": "Activo"}, {"legajo": "2048", "nombre": "ESTEVEZ, MIGUEL ANGEL", "estado": "Activo"}, {"legajo": "2079", "nombre": "VELARDE, JORGE DIEGO ALBERTO", "estado": "Activo"}, {"legajo": "1420", "nombre": "HUENCHILLAN, GUSTAVO", "estado": "Activo"}]};
+const EMPLEADO_CLIENT_COD = "1058"; // CONSUMIDOR FINAL EMPLEADOS
+const DESCUENTO_RUBROS = ["COMEDOR","BEBIDAS"];
+
+let state = {
+  cliente: null,
+  empleado: null,
+  cart: {}, // key: nombre+rubro -> {rubro,nombre,precio,cant}
+  prodTab: "TODOS"
+};
+
+document.getElementById('dateBadge').textContent = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+
+function money(n){
+  return "$" + n.toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+// ---------- CLIENTE ----------
+const clienteSearch = document.getElementById('clienteSearch');
+clienteSearch.addEventListener('input', ()=>{
+  const q = clienteSearch.value.trim().toLowerCase();
+  const box = document.getElementById('clienteResults');
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const matches = DATA.clientes.filter(c=>
+    c.cod.includes(q) || c.nombre.toLowerCase().includes(q)
+  ).slice(0,25);
+  if(matches.length===0){
+    box.innerHTML = '<div class="rrow" style="cursor:default;color:#9db0ba;">Sin resultados</div>';
+  } else {
+    box.innerHTML = matches.map(c=>
+      `<div class="rrow" onclick='pickCliente(${JSON.stringify(JSON.stringify(c))})'>
+        <span>${escapeHtml(c.nombre)}</span><span class="cod">${c.cod}</span>
+      </div>`
+    ).join('');
+  }
+  box.style.display='block';
+});
+
+function pickCliente(cJsonStr){
+  const c = JSON.parse(cJsonStr);
+  state.cliente = c;
+  document.getElementById('clienteResults').style.display='none';
+  document.getElementById('clienteSearch').style.display='none';
+  document.getElementById('clienteSelected').style.display='flex';
+  document.getElementById('clienteNombre').textContent = c.nombre;
+  document.getElementById('clienteCod').textContent = c.cod;
+  document.getElementById('stepCliente').classList.add('done');
+
+  const esEmpleado = c.cod === EMPLEADO_CLIENT_COD;
+  const stepEmp = document.getElementById('stepEmpleado');
+  if(esEmpleado){
+    stepEmp.classList.remove('locked');
+    document.getElementById('stepProductos').classList.add('locked');
+    resetLegajo();
+  } else {
+    stepEmp.classList.add('locked');
+    state.empleado = null;
+    document.getElementById('stepProductos').classList.remove('locked');
+  }
+  renderCart();
+}
+
+function resetCliente(){
+  state.cliente = null;
+  state.empleado = null;
+  document.getElementById('clienteSearch').style.display='block';
+  document.getElementById('clienteSearch').value='';
+  document.getElementById('clienteSelected').style.display='none';
+  document.getElementById('stepCliente').classList.remove('done');
+  document.getElementById('stepEmpleado').classList.add('locked');
+  document.getElementById('stepProductos').classList.add('locked');
+  resetLegajo();
+  renderCart();
+}
+
+// ---------- EMPLEADO / LEGAJO ----------
+const legajoSearch = document.getElementById('legajoSearch');
+legajoSearch.addEventListener('input', ()=>{
+  const q = legajoSearch.value.trim().toLowerCase();
+  const box = document.getElementById('legajoResults');
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const matches = DATA.empleados.filter(e=>
+    e.legajo.includes(q) || e.nombre.toLowerCase().includes(q)
+  ).slice(0,25);
+  if(matches.length===0){
+    box.innerHTML = '<div class="rrow" style="cursor:default;color:#9db0ba;">Sin resultados</div>';
+  } else {
+    box.innerHTML = matches.map(e=>
+      `<div class="rrow" onclick='pickLegajo(${JSON.stringify(JSON.stringify(e))})'>
+        <span>${escapeHtml(e.nombre)}</span><span class="cod">Leg. ${e.legajo}</span>
+      </div>`
+    ).join('');
+  }
+  box.style.display='block';
+});
+
+function pickLegajo(eJsonStr){
+  const e = JSON.parse(eJsonStr);
+  state.empleado = e;
+  document.getElementById('legajoResults').style.display='none';
+  document.getElementById('legajoSearch').style.display='none';
+  document.getElementById('legajoSelected').style.display='flex';
+  document.getElementById('legajoNombre').textContent = e.nombre;
+  document.getElementById('legajoNum').textContent = e.legajo;
+  document.getElementById('legajoEstado').textContent = e.estado;
+
+  const statusBox = document.getElementById('empStatus');
+  const descRow = document.getElementById('descuentoRow');
+  if(e.estado.toLowerCase() === 'activo'){
+    statusBox.className = 'emp-status ok';
+    statusBox.textContent = 'Empleado activo — aplica descuento en Comedor y Bebidas.';
+    descRow.style.display = 'flex';
+    document.getElementById('stepProductos').classList.remove('locked');
+  } else {
+    statusBox.className = 'emp-status bad';
+    statusBox.textContent = 'Este legajo no figura activo. Verificar antes de aplicar el descuento.';
+    descRow.style.display = 'none';
+    document.getElementById('stepProductos').classList.add('locked');
+  }
+  document.getElementById('stepEmpleado').classList.add('done');
+  renderCart();
+}
+
+function resetLegajo(){
+  state.empleado = null;
+  document.getElementById('legajoSearch').style.display='block';
+  document.getElementById('legajoSearch').value='';
+  document.getElementById('legajoResults').style.display='none';
+  document.getElementById('legajoSelected').style.display='none';
+  document.getElementById('empStatus').className='emp-status';
+  document.getElementById('descuentoRow').style.display='none';
+  document.getElementById('stepEmpleado').classList.remove('done');
+  if(state.cliente && state.cliente.cod === EMPLEADO_CLIENT_COD){
+    document.getElementById('stepProductos').classList.add('locked');
+  }
+  renderCart();
+}
+
+// ---------- PRODUCTOS ----------
+const rubros = ["TODOS", ...Array.from(new Set(DATA.productos.map(p=>p.rubro)))];
+document.getElementById('prodTabs').innerHTML = rubros.map(r=>
+  `<button class="${r==='TODOS'?'active':''}" data-r="${r}" onclick="setProdTab('${r}')">${r}</button>`
+).join('');
+
+function setProdTab(r){
+  state.prodTab = r;
+  document.querySelectorAll('#prodTabs button').forEach(b=>b.classList.toggle('active', b.dataset.r===r));
+  renderProdList();
+}
+
+const prodSearch = document.getElementById('prodSearch');
+prodSearch.addEventListener('input', renderProdList);
+
+function renderProdList(){
+  const q = prodSearch.value.trim().toLowerCase();
+  let list = DATA.productos;
+  if(state.prodTab !== 'TODOS') list = list.filter(p=>p.rubro===state.prodTab);
+  if(q) list = list.filter(p=>p.nombre.toLowerCase().includes(q));
+  list = list.slice(0,150);
+  const box = document.getElementById('prodResults');
+  const empleadoOk = state.empleado && state.empleado.estado.toLowerCase()==='activo';
+  if(list.length===0){
+    box.innerHTML = '<div class="rrow" style="cursor:default;color:#9db0ba;">Sin resultados</div>';
+  } else {
+    box.innerHTML = list.map(p=>{
+      const aplica = empleadoOk && DESCUENTO_RUBROS.includes(p.rubro);
+      return `<div class="prow" onclick='addToCart(${JSON.stringify(JSON.stringify(p))})'>
+        <div class="pname">${escapeHtml(p.nombre)} <span class="rubro-pill">${p.rubro}</span>
+          ${aplica?'<span class="pdisc">con descuento empleado</span>':''}
+        </div>
+        <div class="pprice">${money(p.precio)}</div>
+      </div>`;
+    }).join('');
+  }
+  box.style.display='block';
+}
+renderProdList();
+
+function addToCart(pJsonStr){
+  const p = JSON.parse(pJsonStr);
+  const key = p.rubro + '||' + p.nombre;
+  if(!state.cart[key]) state.cart[key] = {...p, cant:0};
+  state.cart[key].cant += 1;
+  document.getElementById('stepCarrito').classList.remove('locked');
+  renderCart();
+}
+
+function changeQty(key, delta){
+  if(!state.cart[key]) return;
+  state.cart[key].cant += delta;
+  if(state.cart[key].cant <= 0) delete state.cart[key];
+  renderCart();
+}
+
+function removeItem(key){
+  delete state.cart[key];
+  renderCart();
+}
+
+function vaciarCarrito(){
+  state.cart = {};
+  renderCart();
+}
+
+function getDescuentoPct(){
+  const v = parseFloat(document.getElementById('descuentoPct').value);
+  return isNaN(v) ? 0 : Math.min(100, Math.max(0, v));
+}
+
+function empleadoActivoAplica(){
+  return !!(state.empleado && state.empleado.estado.toLowerCase()==='activo' && state.cliente && state.cliente.cod===EMPLEADO_CLIENT_COD);
+}
+
+function renderCart(){
+  const cartArea = document.getElementById('cartArea');
+  const keys = Object.keys(state.cart);
+  const totalsArea = document.getElementById('totalsArea');
+  const btnFacturar = document.getElementById('btnFacturar');
+
+  if(keys.length===0){
+    cartArea.innerHTML = '<div class="empty">Todavía no agregaste artículos.</div>';
+    totalsArea.style.display='none';
+    btnFacturar.disabled = true;
+    return;
+  }
+
+  const aplicaDesc = empleadoActivoAplica();
+  const pct = getDescuentoPct();
+
+  let rows = '';
+  let subtotal = 0;
+  let descuentoTotal = 0;
+  keys.forEach(key=>{
+    const it = state.cart[key];
+    const lineTotal = it.precio * it.cant;
+    subtotal += lineTotal;
+    const itemDesc = (aplicaDesc && DESCUENTO_RUBROS.includes(it.rubro)) ? lineTotal * (pct/100) : 0;
+    descuentoTotal += itemDesc;
+    rows += `<tr>
+      <td>${escapeHtml(it.nombre)}<br><span class="rubro-pill">${it.rubro}</span>${itemDesc>0?'<span class="pdisc"> -'+pct+'%</span>':''}</td>
+      <td class="num">
+        <div class="qtywrap">
+          <button class="qtybtn" onclick="changeQty('${key.replace(/'/g,"\\'")}',-1)">−</button>
+          <span>${it.cant}</span>
+          <button class="qtybtn" onclick="changeQty('${key.replace(/'/g,"\\'")}',1)">+</button>
+        </div>
+      </td>
+      <td class="num">${money(it.precio)}</td>
+      <td class="num">${money(lineTotal - itemDesc)}</td>
+      <td><button class="rmbtn" onclick="removeItem('${key.replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>`;
+  });
+
+  cartArea.innerHTML = `<table class="cart">
+    <tr><th>Artículo</th><th style="text-align:right;">Cant.</th><th style="text-align:right;">P. unit.</th><th style="text-align:right;">Total</th><th></th></tr>
+    ${rows}
+  </table>`;
+
+  const total = subtotal - descuentoTotal;
+  document.getElementById('tSubtotal').textContent = money(subtotal);
+  const descRow = document.getElementById('tDescRow');
+  if(descuentoTotal > 0){
+    descRow.style.display='flex';
+    document.getElementById('tDescLabel').textContent = `Descuento empleado (Comedor/Bebidas, ${pct}%)`;
+    document.getElementById('tDesc').textContent = '-' + money(descuentoTotal);
+  } else {
+    descRow.style.display='none';
+  }
+  document.getElementById('tTotal').textContent = money(total);
+  totalsArea.style.display='block';
+  btnFacturar.disabled = false;
+}
+
+// ---------- COMPROBANTE ----------
+function mostrarComprobante(){
+  const keys = Object.keys(state.cart);
+  if(keys.length===0) return;
+  const aplicaDesc = empleadoActivoAplica();
+  const pct = getDescuentoPct();
+  let subtotal=0, descuentoTotal=0;
+  let rows = '';
+  keys.forEach(key=>{
+    const it = state.cart[key];
+    const lineTotal = it.precio * it.cant;
+    subtotal += lineTotal;
+    const itemDesc = (aplicaDesc && DESCUENTO_RUBROS.includes(it.rubro)) ? lineTotal * (pct/100) : 0;
+    descuentoTotal += itemDesc;
+    rows += `<tr>
+      <td>${escapeHtml(it.nombre)} <span class="muted">(${it.rubro})</span></td>
+      <td class="num">${it.cant}</td>
+      <td class="num">${money(it.precio)}</td>
+      <td class="num">${money(lineTotal - itemDesc)}</td>
+    </tr>`;
+  });
+  const total = subtotal - descuentoTotal;
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-AR') + ' ' + now.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+
+  let clienteLine = state.cliente.nombre + ' (cód. ' + state.cliente.cod + ')';
+  let empleadoLine = '';
+  if(state.empleado){
+    empleadoLine = `<div class="muted">Legajo ${state.empleado.legajo} — ${escapeHtml(state.empleado.nombre)} (${state.empleado.estado})</div>`;
+  }
+
+  document.getElementById('compInner').innerHTML = `
+    <h3>Comprobante provisorio de venta</h3>
+    <div class="muted">Documento interno — no válido como factura fiscal. Cargar en el sistema al restablecerse.</div>
+    <div class="muted">${fecha}</div>
+    <div style="margin-top:10px;"><b>Cliente:</b> ${escapeHtml(clienteLine)}</div>
+    ${empleadoLine}
+    <table>
+      <tr><th>Artículo</th><th class="num">Cant.</th><th class="num">P. unit.</th><th class="num">Total</th></tr>
+      ${rows}
+    </table>
+    <div class="tot">
+      <div>Subtotal: ${money(subtotal)}</div>
+      ${descuentoTotal>0 ? `<div>Descuento (${pct}%): -${money(descuentoTotal)}</div>` : ''}
+      <div class="g">TOTAL: ${money(total)}</div>
+    </div>
+  `;
+
+  document.getElementById('stepComprobante').style.display='block';
+  document.getElementById('stepComprobante').scrollIntoView({behavior:'smooth'});
+}
+
+function nuevaVenta(){
+  state.cart = {};
+  document.getElementById('stepComprobante').style.display='none';
+  renderCart();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
