@@ -6,16 +6,16 @@
 <title>Facturación Provisoria</title>
 <style>
   :root{
-    --bg:#12181c;
-    --panel:#1a2228;
-    --panel2:#212b32;
-    --line:#2c3944;
-    --ink:#eef3f5;
-    --ink-dim:#9db0ba;
+    --bg:#f3f4f6;
+    --panel:#ffffff;
+    --panel2:#f3f5f7;
+    --line:#e0e3e7;
+    --ink:#1d2529;
+    --ink-dim:#6d7982;
     --accent:#ef8b4c;
-    --accent-ink:#1a1008;
-    --good:#4caf7d;
-    --bad:#e2604f;
+    --accent-ink:#241206;
+    --good:#2f8f5f;
+    --bad:#c94b3a;
     --radius:10px;
     --mono: 'SF Mono', 'Consolas', monospace;
   }
@@ -43,7 +43,7 @@
   .resultbox{margin-top:8px;max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel2);}
   .rrow{padding:9px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.85rem;display:flex;justify-content:space-between;gap:10px;}
   .rrow:last-child{border-bottom:none;}
-  .rrow:hover{background:#28343c;}
+  .rrow:hover{background:#eceff2;}
   .rrow .cod{color:var(--ink-dim);font-size:.72rem;font-family:var(--mono);flex-shrink:0;}
 
   .selected-card{margin-top:10px;background:var(--panel2);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
@@ -64,7 +64,7 @@
   .prod-tabs button.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;}
   .prow{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:.85rem;gap:8px;cursor:pointer;}
   .prow:last-child{border-bottom:none;}
-  .prow:hover{background:#28343c;}
+  .prow:hover{background:#eceff2;}
   .prow .pname{flex:1;}
   .prow .pprice{font-family:var(--mono);color:var(--ink-dim);font-size:.78rem;flex-shrink:0;}
   .prow .pdisc{color:var(--accent);font-size:.68rem;display:block;}
