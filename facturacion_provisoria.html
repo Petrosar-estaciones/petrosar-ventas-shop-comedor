@@ -194,6 +194,22 @@
     </div>
   </div>
 
+  <!-- REGISTRO DE VENTAS -->
+  <div class="step" id="stepRegistro">
+    <h2><span class="n">📋</span> Registro de ventas del día <span id="regCount" style="font-weight:400;color:var(--ink-dim);"></span></h2>
+    <div class="sub" style="font-size:.72rem;color:var(--ink-dim);margin-bottom:8px;">
+      Se guarda en este dispositivo/navegador. Descargalo en CSV para cargarlo en el sistema cuando vuelva.
+    </div>
+    <div id="regArea"><div class="empty">Todavía no generaste ningún comprobante.</div></div>
+    <div class="totals" id="regTotalsArea" style="display:none;">
+      <div class="trow grand"><span>Total acumulado</span><span id="regGranTotal">$0</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn-secondary" onclick="descargarCSV()">Descargar CSV</button>
+      <button class="btn-secondary" style="color:var(--bad);" onclick="vaciarRegistro()">Borrar registro</button>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -471,6 +487,127 @@ function renderCart(){
 }
 
 // ---------- COMPROBANTE ----------
+// ---------- REGISTRO DE VENTAS (localStorage) ----------
+const REG_KEY = 'facturacion_registro_v1';
+
+function loadRegistro(){
+  try{
+    const raw = localStorage.getItem(REG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function saveRegistro(list){
+  try{
+    localStorage.setItem(REG_KEY, JSON.stringify(list));
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+function guardarVentaEnRegistro(venta){
+  const list = loadRegistro();
+  list.push(venta);
+  const ok = saveRegistro(list);
+  renderRegistro();
+  if(!ok){
+    alert('No se pudo guardar en el registro local (puede que el navegador esté bloqueando el almacenamiento). Descargá el CSV apenas puedas para no perder la venta.');
+  }
+}
+
+function renderRegistro(){
+  const list = loadRegistro();
+  const area = document.getElementById('regArea');
+  const totalsArea = document.getElementById('regTotalsArea');
+  const countEl = document.getElementById('regCount');
+  countEl.textContent = list.length ? `(${list.length})` : '';
+
+  if(list.length===0){
+    area.innerHTML = '<div class="empty">Todavía no generaste ningún comprobante.</div>';
+    totalsArea.style.display='none';
+    return;
+  }
+
+  let granTotal = 0;
+  const rows = list.slice().reverse().map((v, idxRev)=>{
+    granTotal += v.total;
+    const idx = list.length - 1 - idxRev;
+    const empLine = v.empleado ? ` · Leg. ${escapeHtml(v.empleado.legajo)} ${escapeHtml(v.empleado.nombre)}` : '';
+    return `<tr>
+      <td>${v.fecha}<br><span class="rubro-pill">${escapeHtml(v.cliente.nombre)}${empLine}</span></td>
+      <td class="num">${v.items.length} ítem(s)</td>
+      <td class="num">${money(v.total)}</td>
+      <td><button class="rmbtn" title="Eliminar esta venta del registro" onclick="eliminarVentaRegistro(${idx})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  area.innerHTML = `<table class="cart">
+    <tr><th>Fecha / Cliente</th><th style="text-align:right;">Detalle</th><th style="text-align:right;">Total</th><th></th></tr>
+    ${rows}
+  </table>`;
+
+  document.getElementById('regGranTotal').textContent = money(granTotal);
+  totalsArea.style.display='block';
+}
+
+function eliminarVentaRegistro(idx){
+  const list = loadRegistro();
+  list.splice(idx,1);
+  saveRegistro(list);
+  renderRegistro();
+}
+
+function vaciarRegistro(){
+  if(!confirm('¿Borrar todas las ventas guardadas en este dispositivo? Esta acción no se puede deshacer. Si todavía no descargaste el CSV, hacelo antes de borrar.')) return;
+  saveRegistro([]);
+  renderRegistro();
+}
+
+function descargarCSV(){
+  const list = loadRegistro();
+  if(list.length===0){ alert('No hay ventas guardadas todavía.'); return; }
+  const header = ['venta_id','fecha','hora','cod_cliente','cliente','legajo_empleado','empleado','rubro','articulo','cantidad','precio_unitario','descuento_pct','total_linea'];
+  const rows = [header.join(';')];
+  list.forEach((v, i)=>{
+    v.items.forEach(it=>{
+      rows.push([
+        i+1,
+        v.fechaCorta,
+        v.horaCorta,
+        v.cliente.cod,
+        csvSafe(v.cliente.nombre),
+        v.empleado ? v.empleado.legajo : '',
+        v.empleado ? csvSafe(v.empleado.nombre) : '',
+        it.rubro,
+        csvSafe(it.nombre),
+        it.cant,
+        it.precio,
+        it.descPct || 0,
+        it.totalLinea
+      ].join(';'));
+    });
+  });
+  const csvContent = '\uFEFF' + rows.join('\n');
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,10);
+  a.href = url;
+  a.download = `registro_ventas_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvSafe(s){
+  return String(s).replace(/;/g, ',');
+}
+
 function mostrarComprobante(){
   const keys = Object.keys(state.cart);
   if(keys.length===0) return;
@@ -478,6 +615,7 @@ function mostrarComprobante(){
   const pct = getDescuentoPct();
   let subtotal=0, descuentoTotal=0;
   let rows = '';
+  const itemsRegistro = [];
   keys.forEach(key=>{
     const it = state.cart[key];
     const lineTotal = it.precio * it.cant;
@@ -490,6 +628,14 @@ function mostrarComprobante(){
       <td class="num">${money(it.precio)}</td>
       <td class="num">${money(lineTotal - itemDesc)}</td>
     </tr>`;
+    itemsRegistro.push({
+      rubro: it.rubro,
+      nombre: it.nombre,
+      cant: it.cant,
+      precio: it.precio,
+      descPct: itemDesc>0 ? pct : 0,
+      totalLinea: Math.round((lineTotal - itemDesc) * 100)/100
+    });
   });
   const total = subtotal - descuentoTotal;
   const now = new Date();
@@ -520,6 +666,18 @@ function mostrarComprobante(){
 
   document.getElementById('stepComprobante').style.display='block';
   document.getElementById('stepComprobante').scrollIntoView({behavior:'smooth'});
+
+  guardarVentaEnRegistro({
+    fecha: fecha,
+    fechaCorta: now.toLocaleDateString('es-AR'),
+    horaCorta: now.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}),
+    cliente: {cod: state.cliente.cod, nombre: state.cliente.nombre},
+    empleado: state.empleado ? {legajo: state.empleado.legajo, nombre: state.empleado.nombre} : null,
+    items: itemsRegistro,
+    subtotal: Math.round(subtotal*100)/100,
+    descuento: Math.round(descuentoTotal*100)/100,
+    total: Math.round(total*100)/100
+  });
 }
 
 function nuevaVenta(){
@@ -532,6 +690,8 @@ function nuevaVenta(){
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+renderRegistro();
 </script>
 </body>
 </html>
