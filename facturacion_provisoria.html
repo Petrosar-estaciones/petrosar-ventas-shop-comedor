@@ -398,6 +398,10 @@ function addToCart(pJsonStr){
   state.cart[key].cant += 1;
   document.getElementById('stepCarrito').classList.remove('locked');
   renderCart();
+  // limpiar el buscador para poder elegir el próximo artículo sin tener que borrar a mano
+  prodSearch.value = '';
+  renderProdList();
+  prodSearch.focus();
 }
 
 function changeQty(key, delta){
@@ -678,6 +682,10 @@ function mostrarComprobante(){
     descuento: Math.round(descuentoTotal*100)/100,
     total: Math.round(total*100)/100
   });
+
+  // la venta ya quedó guardada en el comprobante y en el registro: vaciamos el cuerpo automáticamente
+  state.cart = {};
+  renderCart();
 }
 
 function nuevaVenta(){
