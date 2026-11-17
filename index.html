@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
   :root{
     --navy:#0F2A43;
@@ -272,6 +273,23 @@
     padding-top:16px;
   }
 
+  .btn-export{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.04em;
+    border:none;
+    border-radius:7px;
+    background:#1D6F42;
+    color:#fff;
+    padding:9px 16px;
+    cursor:pointer;
+    display:inline-flex;align-items:center;gap:8px;
+    transition:background .15s ease;
+  }
+  .btn-export:hover{background:#155233;}
+  .btn-export:disabled{opacity:.6;cursor:wait;}
+
   .tabs{
     display:inline-flex;
     background:#EFEAD9;
@@ -501,7 +519,10 @@
     <section style="padding-top:26px;">
       <div class="section-head">
         <h2>Cuadro completo</h2>
-        <div class="legend"><span style="color:var(--ink-soft);">Valores netos, sin IVA · misma fuente que el panel</span></div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div class="legend"><span style="color:var(--ink-soft);">Valores netos, sin IVA · misma fuente que el panel</span></div>
+          <button class="btn-export" id="btnExportarExcel" type="button">⬇ Exportar a Excel</button>
+        </div>
       </div>
       <div class="card" style="overflow-x:auto;">
         <table id="tablaCuadro" style="min-width:640px;"></table>
@@ -611,6 +632,7 @@ async function cargarDatos(){
     renderDesglose(RUBRO_ACTIVO);
     renderCuadro();
     inicializarNavVistas();
+    document.getElementById('btnExportarExcel').addEventListener('click', exportarExcel);
 
     document.getElementById('cargando').style.display = 'none';
     document.getElementById('contenido').style.display = 'block';
@@ -954,6 +976,163 @@ function renderCuadro(){
 
   html += '</tbody>';
   document.getElementById('tablaCuadro').innerHTML = html;
+}
+
+// ─── EXPORTAR CUADRO A EXCEL ─────────────────────────────────────────────
+function colLetra(n){
+  let s = '';
+  while (n > 0){ const m = (n-1) % 26; s = String.fromCharCode(65+m) + s; n = Math.floor((n-1)/26); }
+  return s;
+}
+
+async function exportarExcel(){
+  if (typeof ExcelJS === 'undefined'){
+    alert('No se pudo cargar la librería de Excel. Revisá la conexión a internet y recargá la página.');
+    return;
+  }
+  const btn = document.getElementById('btnExportarExcel');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Generando…';
+
+  try {
+    const cols = MESES_COLS;
+    const nCols = cols.length + 3;               // Rubro Mayor + Rubro + meses + Total
+    const colPrimerMes = 3;
+    const colUltimoMes = 2 + cols.length;
+    const colTotal = nCols;
+    const FMT = '"$" #,##0;[Red]-"$" #,##0';
+    const borde = { style:'thin', color:{ argb:'FFDAD5C7' } };
+    const bordeFuerte = { style:'medium', color:{ argb:'FF1C2B36' } };
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'PETROSAR';
+    wb.created = new Date();
+    const ws = wb.addWorksheet('Cuadro', { views:[{ state:'frozen', xSplit:2, ySplit:4 }] });
+    ws.columns = [{ width:16 }, { width:32 }, ...cols.map(()=>({ width:15 })), { width:18 }];
+
+    // Título
+    ws.mergeCells(1, 1, 1, nCols);
+    const t = ws.getCell(1, 1);
+    t.value = 'PETROSAR · EESS CD Tienda — Ventas por rubro (Shop / Comedor)';
+    t.font = { name:'Calibri', size:14, bold:true, color:{ argb:'FF0F2A43' } };
+    ws.mergeCells(2, 1, 2, nCols);
+    const st = ws.getCell(2, 1);
+    st.value = 'Valores netos, sin IVA · Exportado: ' + new Date().toLocaleString('es-AR');
+    st.font = { name:'Calibri', size:10, italic:true, color:{ argb:'FF5B6B76' } };
+
+    // Encabezado
+    const filaHeader = ws.getRow(4);
+    filaHeader.values = ['Rubro Mayor', 'Rubro', ...cols.map(c=>c.nombre), 'Total'];
+    filaHeader.eachCell((cell, c) => {
+      cell.font = { bold:true, color:{ argb:'FFFFFFFF' } };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF0F2A43' } };
+      cell.alignment = { horizontal: c <= 2 ? 'left' : 'center', vertical:'middle' };
+    });
+    filaHeader.height = 20;
+
+    const estilosGrupo = {
+      COMEDOR: { fill:'FFBFDBD1', font:'FF1E4C3F' },
+      SHOP:    { fill:'FFF6D9A6', font:'FF9C6A1B' },
+    };
+
+    let r = 5;
+    const filasSubtotal = [];
+    const granTotalPorMes = cols.map(()=>0);
+
+    ['COMEDOR','SHOP'].forEach(rm => {
+      const subrubros = RUBROS.filter(x => x.rubroMayor === rm);
+      if (!subrubros.length) return;
+      const est = estilosGrupo[rm];
+
+      // Fila de grupo
+      ws.mergeCells(r, 1, r, nCols);
+      const g = ws.getCell(r, 1);
+      g.value = rm;
+      g.font = { bold:true, size:12, color:{ argb:est.font } };
+      g.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:est.fill } };
+      r++;
+
+      const primera = r;
+      const totalesGrupo = cols.map(()=>0);
+
+      subrubros.forEach(sr => {
+        const row = ws.getRow(r);
+        row.getCell(1).value = rm;
+        row.getCell(1).font = { color:{ argb:'FF5B6B76' } };
+        row.getCell(2).value = sr.rubro;
+        let totalFila = 0;
+        cols.forEach((c, i) => {
+          const v = sr.valores[c.label] || 0;
+          totalFila += v; totalesGrupo[i] += v;
+          const cell = row.getCell(colPrimerMes + i);
+          cell.value = v;
+          cell.numFmt = FMT;
+        });
+        const ct = row.getCell(colTotal);
+        ct.value = { formula:`SUM(${colLetra(colPrimerMes)}${r}:${colLetra(colUltimoMes)}${r})`, result: totalFila };
+        ct.numFmt = FMT;
+        ct.font = { bold:true };
+        row.eachCell({ includeEmpty:true }, cell => { cell.border = { bottom: borde }; });
+        r++;
+      });
+      const ultima = r - 1;
+
+      // Subtotal
+      const sub = ws.getRow(r);
+      sub.getCell(2).value = 'Subtotal ' + rm;
+      cols.forEach((c, i) => {
+        const L = colLetra(colPrimerMes + i);
+        const cell = sub.getCell(colPrimerMes + i);
+        cell.value = { formula:`SUM(${L}${primera}:${L}${ultima})`, result: totalesGrupo[i] };
+        cell.numFmt = FMT;
+        granTotalPorMes[i] += totalesGrupo[i];
+      });
+      const Lt = colLetra(colTotal);
+      sub.getCell(colTotal).value = { formula:`SUM(${Lt}${primera}:${Lt}${ultima})`, result: totalesGrupo.reduce((a,b)=>a+b,0) };
+      sub.getCell(colTotal).numFmt = FMT;
+      for (let c = 1; c <= nCols; c++){
+        const cell = sub.getCell(c);
+        cell.font = { bold:true, color:{ argb:est.font } };
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF6F3EC' } };
+        cell.border = { top: bordeFuerte, bottom: borde };
+      }
+      filasSubtotal.push(r);
+      r += 2; // fila en blanco entre grupos
+    });
+
+    // Total general (suma de subtotales)
+    r--;
+    const tot = ws.getRow(r);
+    tot.getCell(2).value = 'TOTAL GENERAL';
+    for (let c = colPrimerMes; c <= colTotal; c++){
+      const L = colLetra(c);
+      const res = c === colTotal ? granTotalPorMes.reduce((a,b)=>a+b,0) : granTotalPorMes[c - colPrimerMes];
+      tot.getCell(c).value = { formula: filasSubtotal.map(f => `${L}${f}`).join('+'), result: res };
+      tot.getCell(c).numFmt = FMT;
+    }
+    for (let c = 1; c <= nCols; c++){
+      const cell = tot.getCell(c);
+      cell.font = { bold:true, size:12, color:{ argb:'FFFFFFFF' } };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF0F2A43' } };
+    }
+    tot.height = 22;
+
+    // Descargar
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const hoy = new Date();
+    const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Cuadro_Shop_Comedor_${fecha}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch(e){
+    alert('No se pudo generar el Excel: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = textoOriginal;
+  }
 }
 
 cargarDatos();
